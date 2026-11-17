@@ -1,0 +1,185 @@
+# Process audit: runs `adoctl audit` against each project listed below, every fortnight, and publishes the report.
+#
+# Read-only. The audit never changes a project. The two optional steps at the end (wiki page, Bugs) are OFF and use the pipeline's own
+# identity, because the read-only audit identity must not be able to write.
+#
+# Schedule. Azure DevOps cron cannot say "every 14 days", so the pipeline is scheduled every Monday and its first step skips (the run
+# succeeds, no report) on the off weeks. Weeks are counted from the anchor Monday below, not by ISO week number: ISO parity breaks at the
+# end of a 53-week year (week 53 and week 1 are both odd, so three weeks pass without an audit). The anchor is an ISO even week (week 48
+# of 2026), so in 2026 this is the same as "run on even ISO weeks". A manual run always runs. Simpler alternative if a fixed calendar is
+# acceptable: cron '30 3 1,15 * *' (the 1st and the 15th, 13 to 17 days apart) and no skip step.
+#
+# Credential. If `auditServiceConnection` names an Azure service connection (the read-only identity `<code>-ado-audit`, runbook Phase 0A),
+# a short-lived Microsoft Entra token for Azure DevOps is obtained with the Azure CLI and used as ADO_TOKEN. If it is empty the pipeline
+# falls back to System.AccessToken (the project's build service identity). The run summary says which one was used. The fallback sees less:
+# whatever it cannot read is listed as NOT COVERED in the report, never as a failure and never as a pass.
+#
+# Previous report (for the trend): the report.json artifact of the last successful run that has one. An artifact is used instead of a
+# reports/ branch because it needs no write access to a protected branch and no merge; the cost is that it expires with the run's retention
+# (the trend then restarts from the next report). Skipped off-week runs are passed over automatically.
+
+trigger: none
+pr: none
+
+schedules:
+  - cron: "30 3 * * 1"            # every Monday 03:30 UTC (09:00 IST); the first step skips the off weeks
+    displayName: Fortnightly process audit (weekly tick, off weeks skip)
+    branches:
+      include: [develop]
+    always: true                   # run even when nothing changed in the repository
+
+parameters:
+  - name: projects
+    type: object
+    default:
+      - name: Sonatype-MLS
+        manifest: manifests/sonatype-mls.yml
+  - name: auditServiceConnection   # <code>-ado-audit-sc ; empty = fall back to System.AccessToken
+    type: string
+    default: ''
+  - name: failOn                   # none | critical | major : fail the run when the audit finds this much
+    type: string
+    default: none
+    values: [none, critical, major]
+  - name: force                    # run now even on an off week (a manual run always runs; this is for the schedule's own off weeks)
+    type: boolean
+    default: false
+  - name: publishToWiki            # OFF. Writes Operations/Process-Audit with the build service identity
+    type: boolean
+    default: false
+  - name: openBugs                 # OFF. Opens one Bug per new critical drift (deduplicated by check id and subject)
+    type: boolean
+    default: false
+
+pool:
+  name: mls-agents
+
+variables:
+  anchorMonday: '2026-11-23'       # an ISO even week; see the header
+  artifactPrefix: audit-report
+
+jobs:
+  - job: audit
+    displayName: Process audit
+    timeoutInMinutes: 60
+    steps:
+      - checkout: self
+        fetchDepth: 1
+
+      - bash: |
+          set -euo pipefail
+          run=true
+          if [ "$(Build.Reason)" = "Schedule" ] && [ "${{ lower(parameters.force) }}" != "true" ]; then
+            weeks=$(( ( $(date -u +%s) - $(date -u -d "$(anchorMonday)" +%s) ) / 604800 ))
+            if [ $(( weeks % 2 )) -ne 0 ]; then run=false; fi
+            echo "Weeks since the anchor Monday $(anchorMonday): $weeks"
+          fi
+          echo "##vso[task.setvariable variable=runAudit]$run"
+          if [ "$run" = "true" ]; then echo "This is an audit week."; else echo "Off week: skipping (the run succeeds, no report)."; fi
+        displayName: Decide whether this is an audit week
+
+      - bash: |
+          set -euo pipefail
+          python3 -m venv "$(Agent.TempDirectory)/adoctl-venv"
+          "$(Agent.TempDirectory)/adoctl-venv/bin/pip" install --quiet ./adoctl
+          "$(Agent.TempDirectory)/adoctl-venv/bin/adoctl" --version
+        displayName: Install adoctl
+        condition: eq(variables.runAudit, 'true')
+
+      - ${{ if ne(parameters.auditServiceConnection, '') }}:
+          - task: AzureCLI@2
+            displayName: Get a read-only Azure DevOps token (service connection ${{ parameters.auditServiceConnection }})
+            condition: eq(variables.runAudit, 'true')
+            inputs:
+              azureSubscription: ${{ parameters.auditServiceConnection }}
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
+                # 499b84ac-... is Azure DevOps' fixed resource id for Microsoft Entra tokens
+                token="$(az account get-access-token --resource 499b84ac-1321-427f-aa17-267ca6975798 --query accessToken -o tsv)"
+                test -n "$token"
+                echo "##vso[task.setvariable variable=ADO_TOKEN;issecret=true]$token"
+                echo "##vso[task.setvariable variable=auditIdentity]the read-only audit identity (service connection ${{ parameters.auditServiceConnection }})"
+      - ${{ if eq(parameters.auditServiceConnection, '') }}:
+          - bash: |
+              echo "##vso[task.setvariable variable=auditIdentity]System.AccessToken (the build service identity), because no audit service connection was given"
+              echo "Using System.AccessToken: it can read less than the audit identity; anything it cannot read is listed as NOT COVERED."
+            displayName: No audit service connection, falling back to System.AccessToken
+            condition: eq(variables.runAudit, 'true')
+
+      - ${{ each p in parameters.projects }}:
+          - bash: |
+              set -uo pipefail
+              adoctl="$(Agent.TempDirectory)/adoctl-venv/bin/adoctl"
+              out="$(Build.ArtifactStagingDirectory)/${{ p.name }}"
+              mkdir -p "$out"
+              prev=()
+              if "$adoctl" fetch-previous --manifest "${{ p.manifest }}" --definition-id "$(System.DefinitionId)" \
+                   --artifact "$(artifactPrefix)-${{ p.name }}" --out "$out/previous.json"; then
+                [ -s "$out/previous.json" ] && prev=(--previous "$out/previous.json")
+              fi
+              fail=()
+              [ "${{ parameters.failOn }}" != "none" ] && fail=(--fail-on "${{ parameters.failOn }}")
+              "$adoctl" audit --manifest "${{ p.manifest }}" --out "$out" ${prev[@]+"${prev[@]}"} ${fail[@]+"${fail[@]}"}
+              code=$?
+              echo "##vso[task.setvariable variable=auditExit_${{ replace(p.name, '-', '_') }}]$code"
+              # 1 means drift at or above failOn (reported by the step after the report is published); 2 or more means the audit itself did not run
+              if [ "$code" -ge 2 ]; then exit "$code"; fi
+              exit 0
+            displayName: Audit ${{ p.name }}
+            condition: eq(variables.runAudit, 'true')
+            env:
+              ADO_TOKEN: $(ADO_TOKEN)                       # unset when the fallback is used; adoctl ignores an unexpanded "$(...)"
+              SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+          - task: PublishPipelineArtifact@1
+            displayName: Publish the report of ${{ p.name }}
+            condition: eq(variables.runAudit, 'true')
+            inputs:
+              targetPath: $(Build.ArtifactStagingDirectory)/${{ p.name }}
+              artifact: $(artifactPrefix)-${{ p.name }}
+
+      - bash: |
+          set -euo pipefail
+          s="$(Build.ArtifactStagingDirectory)/run-summary.md"
+          {
+            echo "# Process audit"
+            echo
+            echo "Credential used: $(auditIdentity)."
+            echo
+            echo "Checks the credential could not read are listed under **Not covered** in each report. They are not passes: the report says nothing about them."
+            echo
+            for f in "$(Build.ArtifactStagingDirectory)"/*/report.md; do echo; cat "$f"; echo; echo '---'; done
+          } > "$s"
+          echo "##vso[task.uploadsummary]$s"
+        displayName: Write the run summary
+        condition: eq(variables.runAudit, 'true')
+
+      - ${{ if eq(parameters.publishToWiki, true) }}:
+          - ${{ each p in parameters.projects }}:
+              - bash: |
+                  "$(Agent.TempDirectory)/adoctl-venv/bin/adoctl" publish-wiki --manifest "${{ p.manifest }}" \
+                    --report "$(Build.ArtifactStagingDirectory)/${{ p.name }}/report.md" --page Operations/Process-Audit --apply
+                displayName: Publish ${{ p.name }} to the wiki (build service identity)
+                condition: eq(variables.runAudit, 'true')
+                env:
+                  SYSTEM_ACCESSTOKEN: $(System.AccessToken)   # not ADO_TOKEN: the read-only identity must not write
+
+      - ${{ if eq(parameters.openBugs, true) }}:
+          - ${{ each p in parameters.projects }}:
+              - bash: |
+                  "$(Agent.TempDirectory)/adoctl-venv/bin/adoctl" open-bugs --manifest "${{ p.manifest }}" \
+                    --report "$(Build.ArtifactStagingDirectory)/${{ p.name }}/report.json" --apply
+                displayName: Open Bugs for critical drift in ${{ p.name }} (build service identity)
+                condition: eq(variables.runAudit, 'true')
+                env:
+                  SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+      - ${{ each p in parameters.projects }}:
+          - bash: |
+              code="$(auditExit_${{ replace(p.name, '-', '_') }})"
+              if [ "$code" != "0" ]; then echo "The audit of ${{ p.name }} found what failOn=${{ parameters.failOn }} says to fail on (exit code $code)."; exit 1; fi
+              echo "Nothing at or above ${{ parameters.failOn }} in ${{ p.name }}."
+            displayName: Fail the run if ${{ p.name }} has drift at or above failOn
+            condition: and(eq(variables.runAudit, 'true'), ne('${{ parameters.failOn }}', 'none'))

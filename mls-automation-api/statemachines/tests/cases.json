@@ -1,0 +1,3081 @@
+[
+ {
+  "machine": "provision-environment",
+  "name": "a request is launched with every mandatory tag and a hardened instance, then terminated at expiry",
+  "now": "2026-11-17T10:00:00.000Z",
+  "executionName": "env-abc123-run1",
+  "input": {
+   "environmentId": "env-abc123",
+   "configuration": "ubuntu24-pg16",
+   "owner": "qa-team",
+   "ticket": "MLS-101",
+   "ttlHours": 8
+  },
+  "mocks": {
+   "LaunchInstance": [
+    {
+     "return": {
+      "Instances": [
+       {
+        "InstanceId": "i-0123456789abcdef0"
+       }
+      ]
+     }
+    }
+   ],
+   "ReadExpiry": [
+    {
+     "return": {
+      "Reservations": [
+       {
+        "Instances": [
+         {
+          "InstanceId": "i-0123456789abcdef0",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T18:00:00Z"
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ],
+   "TerminateInstance": [
+    {
+     "return": {
+      "TerminatingInstances": [
+       {
+        "InstanceId": "i-0123456789abcdef0"
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "expect": {
+   "status": "SUCCEEDED",
+   "path": [
+    "Validate",
+    "Prepare",
+    "Stamp",
+    "BuildTags",
+    "LaunchInstance",
+    "WaitUntilExpiry",
+    "ReadExpiry",
+    "Expired",
+    "TerminateInstance",
+    "Done"
+   ],
+   "waits": [
+    "2026-11-17T18:00:00Z"
+   ],
+   "output": {
+    "environmentId": "env-abc123",
+    "instanceId": "i-0123456789abcdef0",
+    "expiresAt": "2026-11-17T18:00:00Z"
+   },
+   "calls": {
+    "LaunchInstance": {
+     "count": 1,
+     "arguments": {
+      "ClientToken": "env-abc123",
+      "ImageId": "ami-0123456789abcdef0",
+      "InstanceType": "t3.small",
+      "MinCount": 1,
+      "MaxCount": 1,
+      "InstanceInitiatedShutdownBehavior": "stop",
+      "IamInstanceProfile": {
+       "Name": "mls-iprof-dev-lab-001"
+      },
+      "NetworkInterfaces": [
+       {
+        "DeviceIndex": 0,
+        "SubnetId": "subnet-0aaaaaaaaaaaaaaa1",
+        "Groups": [
+         "sg-0123456789abcdef0"
+        ],
+        "AssociatePublicIpAddress": false,
+        "DeleteOnTermination": true
+       }
+      ],
+      "MetadataOptions": {
+       "HttpTokens": "required",
+       "HttpEndpoint": "enabled",
+       "HttpPutResponseHopLimit": 1
+      },
+      "CreditSpecification": {
+       "CpuCredits": "standard"
+      },
+      "BlockDeviceMappings": [
+       {
+        "DeviceName": "/dev/sda1",
+        "Ebs": {
+         "VolumeSize": 30,
+         "VolumeType": "gp3",
+         "Encrypted": true,
+         "DeleteOnTermination": true
+        }
+       }
+      ],
+      "UserData": "IyEvYmluL2Jhc2gKc2V0IC1ldQphcHQtZ2V0IGluc3RhbGwgLXkgcG9zdGdyZXNxbC0xNiA+L2Rldi9udWxsIDI+JjEgJiYgZWNobyBhJmIK",
+      "TagSpecifications": [
+       {
+        "ResourceType": "instance",
+        "Tags": [
+         {
+          "Key": "Name",
+          "Value": "env-abc123"
+         },
+         {
+          "Key": "env-id",
+          "Value": "env-abc123"
+         },
+         {
+          "Key": "project",
+          "Value": "mls"
+         },
+         {
+          "Key": "environment",
+          "Value": "dev"
+         },
+         {
+          "Key": "function",
+          "Value": "lab"
+         },
+         {
+          "Key": "owner",
+          "Value": "qa-team"
+         },
+         {
+          "Key": "ticket",
+          "Value": "MLS-101"
+         },
+         {
+          "Key": "configuration",
+          "Value": "ubuntu24-pg16"
+         },
+         {
+          "Key": "ttl",
+          "Value": "8h"
+         },
+         {
+          "Key": "expires-at",
+          "Value": "2026-11-17T18:00:00Z"
+         },
+         {
+          "Key": "requested-at",
+          "Value": "2026-11-17T10:00:00Z"
+         },
+         {
+          "Key": "managed-by",
+          "Value": "provisioning"
+         },
+         {
+          "Key": "data-class",
+          "Value": "none"
+         },
+         {
+          "Key": "execution",
+          "Value": "env-abc123-run1"
+         }
+        ]
+       },
+       {
+        "ResourceType": "volume",
+        "Tags": [
+         {
+          "Key": "Name",
+          "Value": "env-abc123"
+         },
+         {
+          "Key": "env-id",
+          "Value": "env-abc123"
+         },
+         {
+          "Key": "project",
+          "Value": "mls"
+         },
+         {
+          "Key": "environment",
+          "Value": "dev"
+         },
+         {
+          "Key": "function",
+          "Value": "lab"
+         },
+         {
+          "Key": "owner",
+          "Value": "qa-team"
+         },
+         {
+          "Key": "ticket",
+          "Value": "MLS-101"
+         },
+         {
+          "Key": "configuration",
+          "Value": "ubuntu24-pg16"
+         },
+         {
+          "Key": "ttl",
+          "Value": "8h"
+         },
+         {
+          "Key": "expires-at",
+          "Value": "2026-11-17T18:00:00Z"
+         },
+         {
+          "Key": "requested-at",
+          "Value": "2026-11-17T10:00:00Z"
+         },
+         {
+          "Key": "managed-by",
+          "Value": "provisioning"
+         },
+         {
+          "Key": "data-class",
+          "Value": "none"
+         },
+         {
+          "Key": "execution",
+          "Value": "env-abc123-run1"
+         }
+        ]
+       },
+       {
+        "ResourceType": "network-interface",
+        "Tags": [
+         {
+          "Key": "Name",
+          "Value": "env-abc123"
+         },
+         {
+          "Key": "env-id",
+          "Value": "env-abc123"
+         },
+         {
+          "Key": "project",
+          "Value": "mls"
+         },
+         {
+          "Key": "environment",
+          "Value": "dev"
+         },
+         {
+          "Key": "function",
+          "Value": "lab"
+         },
+         {
+          "Key": "owner",
+          "Value": "qa-team"
+         },
+         {
+          "Key": "ticket",
+          "Value": "MLS-101"
+         },
+         {
+          "Key": "configuration",
+          "Value": "ubuntu24-pg16"
+         },
+         {
+          "Key": "ttl",
+          "Value": "8h"
+         },
+         {
+          "Key": "expires-at",
+          "Value": "2026-11-17T18:00:00Z"
+         },
+         {
+          "Key": "requested-at",
+          "Value": "2026-11-17T10:00:00Z"
+         },
+         {
+          "Key": "managed-by",
+          "Value": "provisioning"
+         },
+         {
+          "Key": "data-class",
+          "Value": "none"
+         },
+         {
+          "Key": "execution",
+          "Value": "env-abc123-run1"
+         }
+        ]
+       }
+      ]
+     }
+    },
+    "TerminateInstance": {
+     "count": 1,
+     "arguments": {
+      "InstanceIds": [
+       "i-0123456789abcdef0"
+      ]
+     }
+    }
+   }
+  }
+ },
+ {
+  "machine": "provision-environment",
+  "name": "no ttl means the default of 8 hours",
+  "now": "2026-11-17T10:00:00.000Z",
+  "executionName": "env-abc123-run1",
+  "input": {
+   "environmentId": "env-abc123",
+   "configuration": "ubuntu24-pg16",
+   "owner": "qa-team",
+   "ticket": "MLS-101"
+  },
+  "mocks": {
+   "LaunchInstance": [
+    {
+     "return": {
+      "Instances": [
+       {
+        "InstanceId": "i-0123456789abcdef0"
+       }
+      ]
+     }
+    }
+   ],
+   "ReadExpiry": [
+    {
+     "return": {
+      "Reservations": [
+       {
+        "Instances": [
+         {
+          "InstanceId": "i-0123456789abcdef0",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T18:00:00Z"
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ],
+   "TerminateInstance": [
+    {
+     "return": {
+      "TerminatingInstances": [
+       {
+        "InstanceId": "i-0123456789abcdef0"
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "expect": {
+   "status": "SUCCEEDED",
+   "waits": [
+    "2026-11-17T18:00:00Z"
+   ],
+   "calls": {
+    "LaunchInstance": {
+     "arguments": {
+      "TagSpecifications": [
+       {
+        "Tags": [
+         {
+          "Key": "Name",
+          "Value": "env-abc123"
+         },
+         {
+          "Key": "env-id",
+          "Value": "env-abc123"
+         },
+         {
+          "Key": "project",
+          "Value": "mls"
+         },
+         {
+          "Key": "environment",
+          "Value": "dev"
+         },
+         {
+          "Key": "function",
+          "Value": "lab"
+         },
+         {
+          "Key": "owner",
+          "Value": "qa-team"
+         },
+         {
+          "Key": "ticket",
+          "Value": "MLS-101"
+         },
+         {
+          "Key": "configuration",
+          "Value": "ubuntu24-pg16"
+         },
+         {
+          "Key": "ttl",
+          "Value": "8h"
+         },
+         {
+          "Key": "expires-at",
+          "Value": "2026-11-17T18:00:00Z"
+         },
+         {
+          "Key": "requested-at",
+          "Value": "2026-11-17T10:00:00Z"
+         },
+         {
+          "Key": "managed-by",
+          "Value": "provisioning"
+         },
+         {
+          "Key": "data-class",
+          "Value": "none"
+         },
+         {
+          "Key": "execution",
+          "Value": "env-abc123-run1"
+         }
+        ]
+       },
+       {},
+       {}
+      ]
+     }
+    }
+   }
+  }
+ },
+ {
+  "machine": "provision-environment",
+  "name": "72 hours is the longest life",
+  "now": "2026-11-17T10:00:00.000Z",
+  "executionName": "env-abc123-run1",
+  "input": {
+   "environmentId": "env-abc123",
+   "configuration": "ubuntu24-pg16",
+   "owner": "qa-team",
+   "ticket": "MLS-101",
+   "ttlHours": 72
+  },
+  "mocks": {
+   "LaunchInstance": [
+    {
+     "return": {
+      "Instances": [
+       {
+        "InstanceId": "i-0123456789abcdef0"
+       }
+      ]
+     }
+    }
+   ],
+   "ReadExpiry": [
+    {
+     "return": {
+      "Reservations": [
+       {
+        "Instances": [
+         {
+          "InstanceId": "i-0123456789abcdef0",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-20T10:00:00Z"
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ],
+   "TerminateInstance": [
+    {
+     "return": {
+      "TerminatingInstances": [
+       {
+        "InstanceId": "i-0123456789abcdef0"
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "expect": {
+   "status": "SUCCEEDED",
+   "waits": [
+    "2026-11-20T10:00:00Z"
+   ]
+  }
+ },
+ {
+  "machine": "provision-environment",
+  "name": "an extended expiry is honoured: the wait starts again until the new time",
+  "now": "2026-11-17T10:00:00.000Z",
+  "executionName": "env-abc123-run1",
+  "input": {
+   "environmentId": "env-abc123",
+   "configuration": "ubuntu24-pg16",
+   "owner": "qa-team",
+   "ticket": "MLS-101",
+   "ttlHours": 8
+  },
+  "mocks": {
+   "LaunchInstance": [
+    {
+     "return": {
+      "Instances": [
+       {
+        "InstanceId": "i-0123456789abcdef0"
+       }
+      ]
+     }
+    }
+   ],
+   "ReadExpiry": [
+    {
+     "return": {
+      "Reservations": [
+       {
+        "Instances": [
+         {
+          "InstanceId": "i-0123456789abcdef0",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T20:00:00Z"
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "return": {
+      "Reservations": [
+       {
+        "Instances": [
+         {
+          "InstanceId": "i-0123456789abcdef0",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T20:00:00Z"
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ],
+   "TerminateInstance": [
+    {
+     "return": {
+      "TerminatingInstances": [
+       {
+        "InstanceId": "i-0123456789abcdef0"
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "expect": {
+   "status": "SUCCEEDED",
+   "waits": [
+    "2026-11-17T18:00:00Z",
+    "2026-11-17T20:00:00Z"
+   ],
+   "calls": {
+    "ReadExpiry": {
+     "count": 2
+    },
+    "TerminateInstance": {
+     "count": 1
+    }
+   }
+  }
+ },
+ {
+  "machine": "provision-environment",
+  "name": "an instance already terminated by the reaper or a person ends the run without a second terminate",
+  "now": "2026-11-17T10:00:00.000Z",
+  "executionName": "env-abc123-run1",
+  "input": {
+   "environmentId": "env-abc123",
+   "configuration": "ubuntu24-pg16",
+   "owner": "qa-team",
+   "ticket": "MLS-101",
+   "ttlHours": 8
+  },
+  "mocks": {
+   "LaunchInstance": [
+    {
+     "return": {
+      "Instances": [
+       {
+        "InstanceId": "i-0123456789abcdef0"
+       }
+      ]
+     }
+    }
+   ],
+   "ReadExpiry": [
+    {
+     "return": {
+      "Reservations": [
+       {
+        "Instances": [
+         {
+          "InstanceId": "i-0123456789abcdef0",
+          "State": {
+           "Name": "terminated"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T18:00:00Z"
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "expect": {
+   "status": "SUCCEEDED",
+   "notVisited": [
+    "TerminateInstance"
+   ],
+   "path": [
+    "Validate",
+    "Prepare",
+    "Stamp",
+    "BuildTags",
+    "LaunchInstance",
+    "WaitUntilExpiry",
+    "ReadExpiry",
+    "Expired",
+    "Done"
+   ]
+  }
+ },
+ {
+  "machine": "provision-environment",
+  "name": "if the expires-at tag was removed the last known expiry is used",
+  "now": "2026-11-17T10:00:00.000Z",
+  "executionName": "env-abc123-run1",
+  "input": {
+   "environmentId": "env-abc123",
+   "configuration": "ubuntu24-pg16",
+   "owner": "qa-team",
+   "ticket": "MLS-101",
+   "ttlHours": 8
+  },
+  "mocks": {
+   "LaunchInstance": [
+    {
+     "return": {
+      "Instances": [
+       {
+        "InstanceId": "i-0123456789abcdef0"
+       }
+      ]
+     }
+    }
+   ],
+   "ReadExpiry": [
+    {
+     "return": {
+      "Reservations": [
+       {
+        "Instances": [
+         {
+          "InstanceId": "i-0123456789abcdef0",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": []
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ],
+   "TerminateInstance": [
+    {
+     "return": {
+      "TerminatingInstances": [
+       {
+        "InstanceId": "i-0123456789abcdef0"
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "expect": {
+   "status": "SUCCEEDED",
+   "calls": {
+    "TerminateInstance": {
+     "count": 1
+    }
+   }
+  }
+ },
+ {
+  "machine": "provision-environment",
+  "name": "a launch that fails once is retried and not duplicated",
+  "now": "2026-11-17T10:00:00.000Z",
+  "executionName": "env-abc123-run1",
+  "input": {
+   "environmentId": "env-abc123",
+   "configuration": "ubuntu24-pg16",
+   "owner": "qa-team",
+   "ticket": "MLS-101",
+   "ttlHours": 8
+  },
+  "mocks": {
+   "LaunchInstance": [
+    {
+     "error": "Ec2.Ec2Exception",
+     "cause": "RequestLimitExceeded"
+    },
+    {
+     "return": {
+      "Instances": [
+       {
+        "InstanceId": "i-0123456789abcdef0"
+       }
+      ]
+     }
+    }
+   ],
+   "ReadExpiry": [
+    {
+     "return": {
+      "Reservations": [
+       {
+        "Instances": [
+         {
+          "InstanceId": "i-0123456789abcdef0",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T18:00:00Z"
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ],
+   "TerminateInstance": [
+    {
+     "return": {
+      "TerminatingInstances": [
+       {
+        "InstanceId": "i-0123456789abcdef0"
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "expect": {
+   "status": "SUCCEEDED",
+   "calls": {
+    "LaunchInstance": {
+     "count": 2,
+     "lastArguments": {
+      "ClientToken": "env-abc123"
+     }
+    }
+   }
+  }
+ },
+ {
+  "machine": "provision-environment",
+  "name": "a launch that keeps failing ends as LaunchFailed after three retries",
+  "now": "2026-11-17T10:00:00.000Z",
+  "executionName": "env-abc123-run1",
+  "input": {
+   "environmentId": "env-abc123",
+   "configuration": "ubuntu24-pg16",
+   "owner": "qa-team",
+   "ticket": "MLS-101",
+   "ttlHours": 8
+  },
+  "mocks": {
+   "LaunchInstance": [
+    {
+     "error": "Ec2.Ec2Exception",
+     "cause": "InsufficientInstanceCapacity"
+    },
+    {
+     "error": "Ec2.Ec2Exception",
+     "cause": "InsufficientInstanceCapacity"
+    },
+    {
+     "error": "Ec2.Ec2Exception",
+     "cause": "InsufficientInstanceCapacity"
+    },
+    {
+     "error": "Ec2.Ec2Exception",
+     "cause": "InsufficientInstanceCapacity"
+    }
+   ]
+  },
+  "expect": {
+   "status": "FAILED",
+   "error": "LaunchFailed",
+   "calls": {
+    "LaunchInstance": {
+     "count": 4
+    }
+   },
+   "notVisited": [
+    "WaitUntilExpiry"
+   ]
+  }
+ },
+ {
+  "machine": "provision-environment",
+  "name": "an instance that cannot be read at expiry fails loudly instead of being forgotten",
+  "now": "2026-11-17T10:00:00.000Z",
+  "executionName": "env-abc123-run1",
+  "input": {
+   "environmentId": "env-abc123",
+   "configuration": "ubuntu24-pg16",
+   "owner": "qa-team",
+   "ticket": "MLS-101",
+   "ttlHours": 8
+  },
+  "mocks": {
+   "LaunchInstance": [
+    {
+     "return": {
+      "Instances": [
+       {
+        "InstanceId": "i-0123456789abcdef0"
+       }
+      ]
+     }
+    }
+   ],
+   "ReadExpiry": [
+    {
+     "error": "Ec2.Ec2Exception",
+     "cause": "InvalidInstanceID.NotFound"
+    },
+    {
+     "error": "Ec2.Ec2Exception",
+     "cause": "InvalidInstanceID.NotFound"
+    },
+    {
+     "error": "Ec2.Ec2Exception",
+     "cause": "InvalidInstanceID.NotFound"
+    },
+    {
+     "error": "Ec2.Ec2Exception",
+     "cause": "InvalidInstanceID.NotFound"
+    }
+   ]
+  },
+  "expect": {
+   "status": "FAILED",
+   "error": "InstanceNotReadable",
+   "notVisited": [
+    "TerminateInstance"
+   ]
+  }
+ },
+ {
+  "machine": "provision-environment",
+  "name": "no owner is rejected before anything is created",
+  "now": "2026-11-17T10:00:00.000Z",
+  "executionName": "env-abc123-run1",
+  "input": {
+   "environmentId": "env-abc123",
+   "configuration": "ubuntu24-pg16",
+   "ticket": "MLS-101",
+   "ttlHours": 8
+  },
+  "mocks": {},
+  "expect": {
+   "status": "FAILED",
+   "error": "InvalidRequest",
+   "causeContains": "required",
+   "calls": {
+    "LaunchInstance": {
+     "count": 0
+    }
+   }
+  }
+ },
+ {
+  "machine": "provision-environment",
+  "name": "no ticket is rejected",
+  "now": "2026-11-17T10:00:00.000Z",
+  "executionName": "env-abc123-run1",
+  "input": {
+   "environmentId": "env-abc123",
+   "configuration": "ubuntu24-pg16",
+   "owner": "qa-team",
+   "ttlHours": 8
+  },
+  "mocks": {},
+  "expect": {
+   "status": "FAILED",
+   "error": "InvalidRequest",
+   "causeContains": "required",
+   "calls": {
+    "LaunchInstance": {
+     "count": 0
+    }
+   }
+  }
+ },
+ {
+  "machine": "provision-environment",
+  "name": "no configuration is rejected",
+  "now": "2026-11-17T10:00:00.000Z",
+  "executionName": "env-abc123-run1",
+  "input": {
+   "environmentId": "env-abc123",
+   "owner": "qa-team",
+   "ticket": "MLS-101",
+   "ttlHours": 8
+  },
+  "mocks": {},
+  "expect": {
+   "status": "FAILED",
+   "error": "InvalidRequest",
+   "causeContains": "required",
+   "calls": {
+    "LaunchInstance": {
+     "count": 0
+    }
+   }
+  }
+ },
+ {
+  "machine": "provision-environment",
+  "name": "no environment id is rejected",
+  "now": "2026-11-17T10:00:00.000Z",
+  "executionName": "env-abc123-run1",
+  "input": {
+   "configuration": "ubuntu24-pg16",
+   "owner": "qa-team",
+   "ticket": "MLS-101",
+   "ttlHours": 8
+  },
+  "mocks": {},
+  "expect": {
+   "status": "FAILED",
+   "error": "InvalidRequest",
+   "causeContains": "required",
+   "calls": {
+    "LaunchInstance": {
+     "count": 0
+    }
+   }
+  }
+ },
+ {
+  "machine": "provision-environment",
+  "name": "an owner that is a person's email is rejected",
+  "now": "2026-11-17T10:00:00.000Z",
+  "executionName": "env-abc123-run1",
+  "input": {
+   "environmentId": "env-abc123",
+   "configuration": "ubuntu24-pg16",
+   "owner": "someone@example.com",
+   "ticket": "MLS-101",
+   "ttlHours": 8
+  },
+  "mocks": {},
+  "expect": {
+   "status": "FAILED",
+   "error": "InvalidRequest",
+   "causeContains": "owner must be",
+   "calls": {
+    "LaunchInstance": {
+     "count": 0
+    }
+   }
+  }
+ },
+ {
+  "machine": "provision-environment",
+  "name": "an environment id that is not env-... is rejected",
+  "now": "2026-11-17T10:00:00.000Z",
+  "executionName": "env-abc123-run1",
+  "input": {
+   "environmentId": "abc123",
+   "configuration": "ubuntu24-pg16",
+   "owner": "qa-team",
+   "ticket": "MLS-101",
+   "ttlHours": 8
+  },
+  "mocks": {},
+  "expect": {
+   "status": "FAILED",
+   "error": "InvalidRequest",
+   "causeContains": "environmentId must",
+   "calls": {
+    "LaunchInstance": {
+     "count": 0
+    }
+   }
+  }
+ },
+ {
+  "machine": "provision-environment",
+  "name": "a ticket with spaces is rejected",
+  "now": "2026-11-17T10:00:00.000Z",
+  "executionName": "env-abc123-run1",
+  "input": {
+   "environmentId": "env-abc123",
+   "configuration": "ubuntu24-pg16",
+   "owner": "qa-team",
+   "ticket": "MLS 101",
+   "ttlHours": 8
+  },
+  "mocks": {},
+  "expect": {
+   "status": "FAILED",
+   "error": "InvalidRequest",
+   "causeContains": "ticket",
+   "calls": {
+    "LaunchInstance": {
+     "count": 0
+    }
+   }
+  }
+ },
+ {
+  "machine": "provision-environment",
+  "name": "73 hours is more than the maximum",
+  "now": "2026-11-17T10:00:00.000Z",
+  "executionName": "env-abc123-run1",
+  "input": {
+   "environmentId": "env-abc123",
+   "configuration": "ubuntu24-pg16",
+   "owner": "qa-team",
+   "ticket": "MLS-101",
+   "ttlHours": 73
+  },
+  "mocks": {},
+  "expect": {
+   "status": "FAILED",
+   "error": "InvalidRequest",
+   "causeContains": "whole number from 1 to 72",
+   "calls": {
+    "LaunchInstance": {
+     "count": 0
+    }
+   }
+  }
+ },
+ {
+  "machine": "provision-environment",
+  "name": "0 hours is rejected",
+  "now": "2026-11-17T10:00:00.000Z",
+  "executionName": "env-abc123-run1",
+  "input": {
+   "environmentId": "env-abc123",
+   "configuration": "ubuntu24-pg16",
+   "owner": "qa-team",
+   "ticket": "MLS-101",
+   "ttlHours": 0
+  },
+  "mocks": {},
+  "expect": {
+   "status": "FAILED",
+   "error": "InvalidRequest",
+   "causeContains": "whole number",
+   "calls": {
+    "LaunchInstance": {
+     "count": 0
+    }
+   }
+  }
+ },
+ {
+  "machine": "provision-environment",
+  "name": "half an hour is rejected",
+  "now": "2026-11-17T10:00:00.000Z",
+  "executionName": "env-abc123-run1",
+  "input": {
+   "environmentId": "env-abc123",
+   "configuration": "ubuntu24-pg16",
+   "owner": "qa-team",
+   "ticket": "MLS-101",
+   "ttlHours": 0.5
+  },
+  "mocks": {},
+  "expect": {
+   "status": "FAILED",
+   "error": "InvalidRequest",
+   "causeContains": "whole number",
+   "calls": {
+    "LaunchInstance": {
+     "count": 0
+    }
+   }
+  }
+ },
+ {
+  "machine": "provision-environment",
+  "name": "8.5 hours is rejected",
+  "now": "2026-11-17T10:00:00.000Z",
+  "executionName": "env-abc123-run1",
+  "input": {
+   "environmentId": "env-abc123",
+   "configuration": "ubuntu24-pg16",
+   "owner": "qa-team",
+   "ticket": "MLS-101",
+   "ttlHours": 8.5
+  },
+  "mocks": {},
+  "expect": {
+   "status": "FAILED",
+   "error": "InvalidRequest",
+   "causeContains": "whole number",
+   "calls": {
+    "LaunchInstance": {
+     "count": 0
+    }
+   }
+  }
+ },
+ {
+  "machine": "provision-environment",
+  "name": "a ttl that is text is rejected",
+  "now": "2026-11-17T10:00:00.000Z",
+  "executionName": "env-abc123-run1",
+  "input": {
+   "environmentId": "env-abc123",
+   "configuration": "ubuntu24-pg16",
+   "owner": "qa-team",
+   "ticket": "MLS-101",
+   "ttlHours": "8"
+  },
+  "mocks": {},
+  "expect": {
+   "status": "FAILED",
+   "error": "InvalidRequest",
+   "causeContains": "whole number",
+   "calls": {
+    "LaunchInstance": {
+     "count": 0
+    }
+   }
+  }
+ },
+ {
+  "machine": "provision-environment",
+  "name": "a configuration that is not in the catalogue is rejected",
+  "now": "2026-11-17T10:00:00.000Z",
+  "executionName": "env-abc123-run1",
+  "input": {
+   "environmentId": "env-abc123",
+   "configuration": "windows-xp",
+   "owner": "qa-team",
+   "ticket": "MLS-101",
+   "ttlHours": 8
+  },
+  "mocks": {},
+  "expect": {
+   "status": "FAILED",
+   "error": "UnknownConfiguration",
+   "causeContains": "catalogue",
+   "calls": {
+    "LaunchInstance": {
+     "count": 0
+    }
+   }
+  }
+ },
+ {
+  "machine": "provision-environment",
+  "name": "a number in place of text is rejected without crashing the check",
+  "now": "2026-11-17T10:00:00.000Z",
+  "executionName": "env-abc123-run1",
+  "input": {
+   "environmentId": "env-abc123",
+   "configuration": "ubuntu24-pg16",
+   "owner": 7,
+   "ticket": "MLS-101",
+   "ttlHours": 8
+  },
+  "mocks": {},
+  "expect": {
+   "status": "FAILED",
+   "error": "InvalidRequest",
+   "causeContains": "required",
+   "calls": {
+    "LaunchInstance": {
+     "count": 0
+    }
+   }
+  }
+ },
+ {
+  "machine": "ttl-reaper",
+  "name": "nothing managed means nothing to do",
+  "now": "2026-11-17T10:00:00.000Z",
+  "executionName": "reap-1",
+  "input": {},
+  "mocks": {
+   "FindManagedInstances": [
+    {
+     "return": {
+      "Reservations": []
+     }
+    }
+   ]
+  },
+  "expect": {
+   "status": "SUCCEEDED",
+   "notVisited": [
+    "TerminateExpired"
+   ],
+   "output": {
+    "terminated": 0
+   }
+  }
+ },
+ {
+  "machine": "ttl-reaper",
+  "name": "only the expired instance is terminated",
+  "now": "2026-11-17T10:00:00.000Z",
+  "executionName": "reap-1",
+  "input": {},
+  "mocks": {
+   "FindManagedInstances": [
+    {
+     "return": {
+      "Reservations": [
+       {
+        "Instances": [
+         {
+          "InstanceId": "i-0000000000000000a",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000000b",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T12:00:00Z"
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ],
+   "TerminateExpired": [
+    {
+     "return": {
+      "TerminatingInstances": [
+       {
+        "InstanceId": "i-0123456789abcdef0"
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "expect": {
+   "status": "SUCCEEDED",
+   "output": {
+    "terminated": 1
+   },
+   "calls": {
+    "TerminateExpired": {
+     "count": 1,
+     "arguments": {
+      "InstanceIds": [
+       "i-0000000000000000a"
+      ]
+     }
+    }
+   }
+  }
+ },
+ {
+  "machine": "ttl-reaper",
+  "name": "a second page is read with the token from the first",
+  "now": "2026-11-17T10:00:00.000Z",
+  "executionName": "reap-1",
+  "input": {},
+  "mocks": {
+   "FindManagedInstances": [
+    {
+     "return": {
+      "Reservations": [
+       {
+        "Instances": [
+         {
+          "InstanceId": "i-0000000000000000a",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         }
+        ]
+       }
+      ],
+      "NextToken": "tok1"
+     }
+    }
+   ],
+   "FindNextPage": [
+    {
+     "return": {
+      "Reservations": [
+       {
+        "Instances": [
+         {
+          "InstanceId": "i-0000000000000000c",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ],
+   "TerminateExpired": [
+    {
+     "return": {
+      "TerminatingInstances": [
+       {
+        "InstanceId": "i-0123456789abcdef0"
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "expect": {
+   "status": "SUCCEEDED",
+   "calls": {
+    "FindNextPage": {
+     "count": 1,
+     "arguments": {
+      "NextToken": "tok1"
+     }
+    },
+    "TerminateExpired": {
+     "arguments": {
+      "InstanceIds": [
+       "i-0000000000000000a",
+       "i-0000000000000000c"
+      ]
+     }
+    }
+   }
+  }
+ },
+ {
+  "machine": "ttl-reaper",
+  "name": "an instance with no expires-at tag is left alone and the run fails so the alarm fires",
+  "now": "2026-11-17T10:00:00.000Z",
+  "executionName": "reap-1",
+  "input": {},
+  "mocks": {
+   "FindManagedInstances": [
+    {
+     "return": {
+      "Reservations": [
+       {
+        "Instances": [
+         {
+          "InstanceId": "i-0000000000000000d",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": []
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "expect": {
+   "status": "FAILED",
+   "error": "UntaggedManagedInstances",
+   "notVisited": [
+    "TerminateExpired"
+   ]
+  }
+ },
+ {
+  "machine": "ttl-reaper",
+  "name": "expired ones are still terminated when another has no tag, then the run fails",
+  "now": "2026-11-17T10:00:00.000Z",
+  "executionName": "reap-1",
+  "input": {},
+  "mocks": {
+   "FindManagedInstances": [
+    {
+     "return": {
+      "Reservations": [
+       {
+        "Instances": [
+         {
+          "InstanceId": "i-0000000000000000a",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000000d",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": []
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ],
+   "TerminateExpired": [
+    {
+     "return": {
+      "TerminatingInstances": [
+       {
+        "InstanceId": "i-0123456789abcdef0"
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "expect": {
+   "status": "FAILED",
+   "error": "UntaggedManagedInstances",
+   "path": [
+    "Init",
+    "FindManagedInstances",
+    "MorePages",
+    "TerminateExpired",
+    "AnyUntagged",
+    "UntaggedInstances"
+   ],
+   "calls": {
+    "TerminateExpired": {
+     "arguments": {
+      "InstanceIds": [
+       "i-0000000000000000a"
+      ]
+     }
+    }
+   }
+  }
+ },
+ {
+  "machine": "ttl-reaper",
+  "name": "at most 100 are terminated in one run",
+  "now": "2026-11-17T10:00:00.000Z",
+  "executionName": "reap-1",
+  "input": {},
+  "mocks": {
+   "FindManagedInstances": [
+    {
+     "return": {
+      "Reservations": [
+       {
+        "Instances": [
+         {
+          "InstanceId": "i-00000000000000000",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000001",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000002",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000003",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000004",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000005",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000006",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000007",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000008",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000009",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000000a",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000000b",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000000c",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000000d",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000000e",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000000f",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000010",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000011",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000012",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000013",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000014",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000015",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000016",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000017",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000018",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000019",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000001a",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000001b",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000001c",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000001d",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000001e",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000001f",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000020",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000021",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000022",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000023",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000024",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000025",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000026",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000027",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000028",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000029",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000002a",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000002b",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000002c",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000002d",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000002e",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000002f",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000030",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000031",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000032",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000033",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000034",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000035",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000036",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000037",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000038",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000039",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000003a",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000003b",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000003c",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000003d",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000003e",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000003f",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000040",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000041",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000042",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000043",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000044",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000045",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000046",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000047",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000048",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000049",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000004a",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000004b",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000004c",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000004d",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000004e",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000004f",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000050",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000051",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000052",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000053",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000054",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000055",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000056",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000057",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000058",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000059",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000005a",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000005b",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000005c",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000005d",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000005e",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000005f",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000060",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000061",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000062",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000063",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000064",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000065",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000066",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000067",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000068",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000069",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000006a",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000006b",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000006c",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000006d",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000006e",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-0000000000000006f",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000070",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000071",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000072",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000073",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000074",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000075",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000076",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         },
+         {
+          "InstanceId": "i-00000000000000077",
+          "State": {
+           "Name": "running"
+          },
+          "Tags": [
+           {
+            "Key": "expires-at",
+            "Value": "2026-11-17T09:00:00Z"
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ],
+   "TerminateExpired": [
+    {
+     "return": {
+      "TerminatingInstances": [
+       {
+        "InstanceId": "i-0123456789abcdef0"
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "expect": {
+   "status": "SUCCEEDED",
+   "output": {
+    "terminated": 100
+   }
+  }
+ },
+ {
+  "machine": "ttl-reaper",
+  "name": "the filters only ever select instances this platform launched",
+  "now": "2026-11-17T10:00:00.000Z",
+  "executionName": "reap-1",
+  "input": {},
+  "mocks": {
+   "FindManagedInstances": [
+    {
+     "return": {
+      "Reservations": []
+     }
+    }
+   ]
+  },
+  "expect": {
+   "status": "SUCCEEDED",
+   "calls": {
+    "FindManagedInstances": {
+     "arguments": {
+      "Filters": [
+       {
+        "Name": "tag:managed-by",
+        "Values": [
+         "provisioning"
+        ]
+       },
+       {
+        "Name": "tag:project",
+        "Values": [
+         "mls"
+        ]
+       },
+       {
+        "Name": "instance-state-name",
+        "Values": [
+         "pending",
+         "running",
+         "stopping",
+         "stopped"
+        ]
+       }
+      ],
+      "MaxResults": 200
+     }
+    }
+   }
+  }
+ }
+]

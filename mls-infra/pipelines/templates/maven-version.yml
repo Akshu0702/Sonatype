@@ -1,0 +1,26 @@
+# Decide the version and channel from the branch (Gitflow, build once, promote):
+#   develop        -> channel snapshot, version stays X.Y.Z-SNAPSHOT
+#   release/X.Y.Z  -> channel rc,       version X.Y.Z-rc.N  (N = existing tags vX.Y.Z-rc.* + 1)
+#   anything else  -> channel none (build and test only; nothing is published)
+# Sets the pipeline variables mvnChannel and mvnVersion (empty unless rc). maven-publish.yml uses them.
+parameters:
+  - name: dir
+    type: string
+steps:
+  - script: |
+      set -e
+      cd "${{ parameters.dir }}"
+      REF="$(Build.SourceBranch)"
+      V=""; CH=none
+      case "$REF" in
+        refs/heads/develop) CH=snapshot ;;
+        refs/heads/release/*)
+          BASE="${REF#refs/heads/release/}"
+          N=$(git -c http.extraheader="AUTHORIZATION: bearer $SYSTEM_ACCESSTOKEN" ls-remote --tags origin "refs/tags/v$BASE-rc.*" | grep -v '\^{}' | wc -l)
+          V="$BASE-rc.$((N+1))"; CH=rc ;;
+      esac
+      echo "##vso[task.setvariable variable=mvnChannel]$CH"
+      echo "##vso[task.setvariable variable=mvnVersion]$V"
+      echo "channel=$CH version=${V:-from the pom}"
+    displayName: Resolve version and channel
+    env: { SYSTEM_ACCESSTOKEN: $(System.AccessToken) }

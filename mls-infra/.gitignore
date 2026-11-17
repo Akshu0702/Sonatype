@@ -1,0 +1,28 @@
+# Build output
+node_modules/
+dist/
+build/
+target/
+.terraform/
+*.tfstate
+*.tfstate.*
+
+# Secrets and local config
+.env
+*.pem
+*.key
+*.tfvars
+!example.tfvars
+
+# Editors
+.idea/
+.vscode/
+
+# Helm repository settings written by scripts/ci/helm-checks.sh
+.helm/
+
+# Terraform plans and their JSON, and the local-state override used for planning
+tfplan
+plan.json
+plan.txt
+zz_local_backend_override.tf

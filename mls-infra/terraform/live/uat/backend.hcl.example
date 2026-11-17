@@ -1,0 +1,6 @@
+# Copy to backend.hcl and fill in. The state bucket and lock table come from terraform/live/lab-test/bootstrap.
+bucket         = "mls-s3-dev-store-001"
+key            = "uat/environment.tfstate"
+region         = "ap-south-1"
+dynamodb_table = "mls-s3-dev-store-001-lock"
+encrypt        = true

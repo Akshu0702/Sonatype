@@ -1,0 +1,7 @@
+# uat: no cluster exists yet. Replace REPLACE_WITH_VPC_ID from the Terraform output after the stack is applied.
+aws-load-balancer-controller:
+  clusterName: mls-eks-uat-api-001
+  vpcId: REPLACE_WITH_VPC_ID
+  serviceAccount:
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::096631344162:role/mls-role-uat-api-load-balancer-controller

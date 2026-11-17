@@ -1,0 +1,20 @@
+# portal-api in uat. Rendered by helm/platform/charts/mls-service. Nothing for uat exists in AWS yet: these are values for a cluster that has not been built.
+# image.tag is written by the promote step (a pull request): "unpromoted" means no image has been promoted to this environment.
+# Names ending in .mls.internal are placeholders until the private DNS zone is decided.
+image:
+  repository: harbor.uat.mls.internal/mls/portal-api
+  tag: unpromoted
+pullSecret:
+  remoteRef: mls/uat/harbor/pull-robot
+  registry: harbor.uat.mls.internal
+port: 8080
+healthPath: /api/v1/actuator/health
+env:
+  TENANTS_URL: http://tenants-service
+  AWS_REGION: ap-south-1
+# The environments view reads EC2 with a read-only role (task 7985). Add its eks.amazonaws.com/role-arn annotation here once it exists.
+serviceAccount:
+  annotations: {}
+autoscaling:
+  minReplicas: 2
+  maxReplicas: 4

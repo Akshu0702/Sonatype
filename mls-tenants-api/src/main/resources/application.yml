@@ -1,0 +1,52 @@
+server:
+  port: 8081
+  shutdown: graceful
+  error:
+    include-message: always   # the messages come from this service's own checks ("Name, code or domain already in use"), never from Keycloak
+
+spring:
+  application:
+    name: tenants-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/tenants}
+    username: ${DB_USER:tenants}
+    password: ${DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: 10
+  flyway:
+    enabled: true
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        enable.idempotence: true
+        max.block.ms: 5000
+        request.timeout.ms: 5000
+        delivery.timeout.ms: 10000
+  jackson:
+    default-property-inclusion: non_null
+
+platform:
+  domain: ${PLATFORM_DOMAIN:localhost}
+  auth-server-url: ${AUTH_SERVER_URL:http://localhost:8180}
+  keycloak-internal-url: ${KEYCLOAK_INTERNAL_URL:http://localhost:8180}
+  automation-client-id: ${KEYCLOAK_AUTOMATION_CLIENT_ID:platform-automation}
+  automation-client-secret: ${KEYCLOAK_AUTOMATION_CLIENT_SECRET:}
+  admin-clients: ${PLATFORM_ADMIN_CLIENTS:platform-automation}
+  operator-client-id: ${PLATFORM_OPERATOR_CLIENT:platform-console}
+  operator-role: ${PLATFORM_OPERATOR_ROLE:platform-operator}
+  audit:
+    relay-enabled: ${AUDIT_RELAY_ENABLED:true}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true

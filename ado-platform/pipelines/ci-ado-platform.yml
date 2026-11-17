@@ -1,0 +1,58 @@
+# CI for ado-platform: lint and test adoctl, check the plugin structure, validate the pipeline YAML parses. Publishes nothing, deploys nothing.
+trigger:
+  branches:
+    include: [main, develop, 'feature/*', 'bugfix/*', 'hotfix/*']
+pr:
+  branches:
+    include: [develop, main]
+
+pool:
+  name: mls-agents
+
+steps:
+  - checkout: self
+    fetchDepth: 1
+
+  - bash: |
+      set -euo pipefail
+      python3 -m venv "$(Agent.TempDirectory)/venv"
+      "$(Agent.TempDirectory)/venv/bin/pip" install --quiet "./adoctl[test]"
+    displayName: Install adoctl and the test tools
+
+  - bash: |
+      set -euo pipefail
+      "$(Agent.TempDirectory)/venv/bin/ruff" check .
+    displayName: Lint
+
+  - bash: |
+      set -euo pipefail
+      # plugin/ arrives with its own pull request; test whatever of adoctl and plugin is present
+      "$(Agent.TempDirectory)/venv/bin/python" -m pytest `ls -d adoctl plugin 2>/dev/null | xargs` -q --junitxml="$(Agent.TempDirectory)/tests.xml"
+    displayName: Tests (adoctl against a fake Azure DevOps, plugin hooks)
+
+  - task: PublishTestResults@2
+    displayName: Publish test results
+    condition: always()
+    inputs:
+      testResultsFormat: JUnit
+      testResultsFiles: $(Agent.TempDirectory)/tests.xml
+      testRunTitle: ado-platform
+
+  - bash: |
+      set -euo pipefail
+      if [ -f scripts/check_plugin.py ] && [ -d plugin/ml-ado ]; then
+        "$(Agent.TempDirectory)/venv/bin/python" scripts/check_plugin.py plugin/ml-ado
+      else
+        echo "No plugin in this branch yet: nothing to check."
+      fi
+    displayName: Plugin structure check
+
+  - bash: |
+      set -euo pipefail
+      "$(Agent.TempDirectory)/venv/bin/python" - <<'PY'
+      import glob, yaml
+      for f in sorted(glob.glob("pipelines/*.yml") + glob.glob("manifests/*.yml")):
+          yaml.safe_load(open(f, encoding="utf-8"))
+          print("parses:", f)
+      PY
+    displayName: YAML files parse

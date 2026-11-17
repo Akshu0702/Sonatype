@@ -1,0 +1,30 @@
+# itsm-api in prod. Rendered by helm/platform/charts/mls-service. Nothing for prod exists in AWS yet: these are values for a cluster that has not been built.
+# image.tag is written by the promote step (a pull request): "unpromoted" means no image has been promoted to this environment.
+# Names ending in .mls.internal are placeholders until the private DNS zone is decided.
+image:
+  repository: harbor.prod.mls.internal/mls/itsm-api
+  tag: unpromoted
+pullSecret:
+  remoteRef: mls/prod/harbor/pull-robot
+  registry: harbor.prod.mls.internal
+port: 8082
+healthPath: /actuator/health
+env:
+  DB_URL: jdbc:postgresql://REPLACE_WITH_RDS_ADDRESS:5432/itsm?sslmode=require
+  DB_USER: itsm
+  TENANTS_URL: http://tenants-service
+  ITSM_APPROVERS: REPLACE_WITH_APPROVER_EMAIL
+  ITSM_STORAGE_DIR: /data/builds
+externalSecret:
+  data:
+    - { secretKey: DB_PASSWORD, remoteRef: mls/prod/itsm/db-password }
+# Uploaded build ZIPs are kept on a volume today (the store is not S3 yet), so this service runs ONE replica until it is.
+replicaCount: 1
+autoscaling:
+  enabled: false
+pdb:
+  enabled: false
+persistence:
+  enabled: true
+  size: 50Gi
+  mountPath: /data

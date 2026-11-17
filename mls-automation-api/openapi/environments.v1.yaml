@@ -1,0 +1,414 @@
+openapi: 3.0.3
+info:
+  title: Managed Lab environment status API
+  version: 1.0.0
+  description: |
+    The contract between the **infrastructure thread** (which builds and changes environments) and the
+    **portal thread** (which shows them). Infrastructure writes status reports; the portal reads environments,
+    components, versions and deployments.
+
+    Rules:
+    - The portal never invents state. An environment's components come only from status reports and the reconciler.
+    - A status report is idempotent: the same `reportId` sent twice changes nothing.
+    - Each component keeps its latest report; every report is also kept as an event for history.
+    - `desired` is what the environment should be; `observed` is what was last seen. They differ when there is drift.
+  license:
+    name: Proprietary
+    url: https://dev.azure.com/ML-AIML-COE/Sonatype-MLS/_wiki/wikis/Sonatype-MLS.wiki/1/Home
+servers:
+  - url: https://portal.mls.internal/api/v1
+    description: Lab portal, reachable over the VPN only
+tags:
+  - name: Environments
+    description: Read side, used by the portal
+  - name: Status reports
+    description: Write side, used by automation only
+security:
+  - bearerAuth: []
+paths:
+  /environments:
+    get:
+      tags: [Environments]
+      operationId: listEnvironments
+      summary: List the environments the caller can see
+      description: Scope `environments.view`. Limited to the environments the caller's groups can reach.
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/EnvironmentStatus' }
+        - name: kind
+          in: query
+          schema: { $ref: '#/components/schemas/EnvironmentKind' }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: A page of environments
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Environment' }
+                  nextCursor: { type: string, nullable: true }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+  /environments/{environmentId}:
+    get:
+      tags: [Environments]
+      operationId: getEnvironment
+      summary: One environment with its components
+      description: Scope `environments.view`.
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentId'
+      responses:
+        '200':
+          description: The environment
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnvironmentDetail' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /environments/{environmentId}/versions:
+    get:
+      tags: [Environments]
+      operationId: getEnvironmentVersions
+      summary: Versions deployed in an environment
+      description: Scope `environments.versions`. One row per deployable unit currently observed.
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentId'
+      responses:
+        '200':
+          description: The deployed versions
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [environmentId, items]
+                properties:
+                  environmentId: { type: string }
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/DeployedVersion' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /environments/{environmentId}/deployments:
+    get:
+      tags: [Environments]
+      operationId: listDeployments
+      summary: Deployments and changes made to an environment, newest first
+      description: Scope `environments.view`.
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentId'
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        '200':
+          description: Deployments
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Deployment' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /environments/{environmentId}/events:
+    get:
+      tags: [Environments]
+      operationId: listEnvironmentEvents
+      summary: History of status reports for an environment, newest first
+      description: Scope `environments.view`. Every accepted report, so a status change can be explained afterwards.
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentId'
+        - name: component
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+      responses:
+        '200':
+          description: Events
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/StatusEvent' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /status/overview:
+    get:
+      tags: [Environments]
+      operationId: getStatusOverview
+      summary: Health of every environment at a glance
+      description: Scope `status.overview`.
+      responses:
+        '200':
+          description: Counts by status and the environments needing attention
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StatusOverview' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+  /internal/status-reports:
+    post:
+      tags: [Status reports]
+      operationId: submitStatusReport
+      summary: Report the status of one component of one environment
+      description: |
+        Scope `status.report`, held only by the automation service. Not exposed through the public gateway.
+        Idempotent on `reportId`: a repeat returns `200` and changes nothing.
+        An unknown environment is rejected (`404`); environments are created by the provisioning request, not by a report.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StatusReport' }
+            examples:
+              vpcReady:
+                summary: A network finished creating
+                value:
+                  reportId: 8f1c2d5e-6b55-4d0e-9d6f-2a4e5b7c9a10
+                  environmentId: env-lab-test-001
+                  component: network
+                  type: vpc
+                  version: v0.3.0
+                  status: ready
+                  message: VPC and 6 subnets created
+                  observedAt: '2026-11-16T09:30:00Z'
+                  source: terraform
+                  correlationId: 5d2b7e0a-3c1f-4d51-8a9e-0f2b6c7d8e11
+                  refs: { vpcId: vpc-0abc1234def567890, region: ap-south-1 }
+      responses:
+        '200':
+          description: Already recorded; nothing changed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StatusReportResult' }
+        '201':
+          description: Recorded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StatusReportResult' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Issued through single sign-on for people and by the identity provider's client credentials for automation. Scopes come from the database, never from the token.
+  parameters:
+    EnvironmentId:
+      name: environmentId
+      in: path
+      required: true
+      schema: { type: string, pattern: '^env-[a-z0-9-]{3,60}$' }
+      description: Environment identifier, for example `env-lab-test-001`.
+  responses:
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    EnvironmentKind:
+      type: string
+      enum: [lab, provisioned]
+      description: '`lab` is a standing environment (Env-1, Env-2); `provisioned` is created on request and has a time to live.'
+    EnvironmentStatus:
+      type: string
+      enum: [requested, provisioning, ready, degraded, updating, rolling_back, decommissioning, decommissioned, failed]
+    ComponentStatus:
+      type: string
+      enum: [pending, creating, ready, degraded, failed, absent]
+    ComponentType:
+      type: string
+      enum: [vpc, kms, eks, rds, ec2, helm-release, plugin-bundle, load-balancer, dns, other]
+    ReportSource:
+      type: string
+      enum: [terraform, argocd, ansible, reconciler, workflow, manual]
+    Release:
+      type: object
+      required: [version]
+      properties:
+        version: { type: string, example: v0.3.0 }
+        manifestSha256: { type: string, nullable: true }
+    Environment:
+      type: object
+      required: [id, name, kind, status, region, createdAt, updatedAt]
+      properties:
+        id: { type: string, example: env-lab-test-001 }
+        name: { type: string, example: Lab test 001 }
+        kind: { $ref: '#/components/schemas/EnvironmentKind' }
+        status: { $ref: '#/components/schemas/EnvironmentStatus' }
+        statusReason:
+          type: string
+          nullable: true
+          description: Why the status is what it is, in plain words.
+        blueprint:
+          type: object
+          nullable: true
+          properties:
+            code: { type: string, example: artifactory-ha-eks }
+            version: { type: string, example: 1.0.0 }
+        desired: { $ref: '#/components/schemas/Release' }
+        observed: { $ref: '#/components/schemas/Release' }
+        drift: { type: boolean, description: True when observed differs from desired. }
+        region: { type: string, example: ap-south-1 }
+        accountId: { type: string, example: '096631344162' }
+        ownerGroup: { type: string, nullable: true }
+        ticketId: { type: string, nullable: true }
+        ttlExpiresAt: { type: string, format: date-time, nullable: true }
+        lastObservedAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    EnvironmentDetail:
+      allOf:
+        - $ref: '#/components/schemas/Environment'
+        - type: object
+          required: [components]
+          properties:
+            components:
+              type: array
+              items: { $ref: '#/components/schemas/Component' }
+            lastDeployment:
+              $ref: '#/components/schemas/Deployment'
+    Component:
+      type: object
+      required: [name, type, status, observedAt, source]
+      properties:
+        name: { type: string, example: network }
+        type: { $ref: '#/components/schemas/ComponentType' }
+        version: { type: string, nullable: true, example: v0.3.0 }
+        status: { $ref: '#/components/schemas/ComponentStatus' }
+        message: { type: string, nullable: true }
+        observedAt: { type: string, format: date-time }
+        source: { $ref: '#/components/schemas/ReportSource' }
+        refs:
+          type: object
+          additionalProperties: { type: string }
+          description: Identifiers in the platform, for example a VPC id. Never secrets.
+    DeployedVersion:
+      type: object
+      required: [component, type, version, observedAt]
+      properties:
+        component: { type: string }
+        type: { $ref: '#/components/schemas/ComponentType' }
+        version: { type: string }
+        digest: { type: string, nullable: true, description: Image digest or checksum when known. }
+        observedAt: { type: string, format: date-time }
+    Deployment:
+      type: object
+      required: [id, environmentId, action, status, startedAt]
+      properties:
+        id: { type: string }
+        environmentId: { type: string }
+        action:
+          type: string
+          enum: [provision, upgrade, rollback, release_plugin, teardown, extend]
+        status:
+          type: string
+          enum: [running, succeeded, failed, rolled_back, awaiting_approval]
+        release: { $ref: '#/components/schemas/Release' }
+        correlationId: { type: string, nullable: true }
+        ticketId: { type: string, nullable: true }
+        startedAt: { type: string, format: date-time }
+        finishedAt: { type: string, format: date-time, nullable: true }
+        rolledBack: { type: boolean }
+    StatusEvent:
+      type: object
+      required: [reportId, environmentId, component, status, observedAt, receivedAt, source]
+      properties:
+        reportId: { type: string, format: uuid }
+        environmentId: { type: string }
+        component: { type: string }
+        version: { type: string, nullable: true }
+        status: { $ref: '#/components/schemas/ComponentStatus' }
+        message: { type: string, nullable: true }
+        observedAt: { type: string, format: date-time }
+        receivedAt: { type: string, format: date-time }
+        source: { $ref: '#/components/schemas/ReportSource' }
+        correlationId: { type: string, format: uuid, nullable: true }
+    StatusOverview:
+      type: object
+      required: [byStatus, needingAttention, generatedAt]
+      properties:
+        byStatus:
+          type: object
+          additionalProperties: { type: integer, minimum: 0 }
+        needingAttention:
+          type: array
+          items:
+            type: object
+            required: [environmentId, status]
+            properties:
+              environmentId: { type: string }
+              status: { $ref: '#/components/schemas/EnvironmentStatus' }
+              reason: { type: string, nullable: true }
+        generatedAt: { type: string, format: date-time }
+    StatusReport:
+      type: object
+      required: [reportId, environmentId, component, type, status, observedAt, source]
+      properties:
+        reportId:
+          type: string
+          format: uuid
+          description: Chosen by the sender. The same id sent again is ignored.
+        environmentId: { type: string, pattern: '^env-[a-z0-9-]{3,60}$' }
+        component: { type: string, minLength: 1, maxLength: 60, pattern: '^[a-z0-9][a-z0-9-]*$' }
+        type: { $ref: '#/components/schemas/ComponentType' }
+        version: { type: string, nullable: true, maxLength: 80 }
+        status: { $ref: '#/components/schemas/ComponentStatus' }
+        message: { type: string, nullable: true, maxLength: 500 }
+        observedAt: { type: string, format: date-time }
+        source: { $ref: '#/components/schemas/ReportSource' }
+        correlationId: { type: string, format: uuid, nullable: true }
+        deploymentId: { type: string, nullable: true }
+        releaseVersion:
+          type: string
+          nullable: true
+          maxLength: 80
+          description: The release this component was deployed from. Updates the environment's observed release.
+        refs:
+          type: object
+          maxProperties: 20
+          additionalProperties: { type: string, maxLength: 200 }
+    StatusReportResult:
+      type: object
+      required: [reportId, accepted, environmentStatus]
+      properties:
+        reportId: { type: string, format: uuid }
+        accepted: { type: boolean, description: False when it was a repeat. }
+        environmentStatus: { $ref: '#/components/schemas/EnvironmentStatus' }
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string, example: not_found }
+        message: { type: string }
+        requestId: { type: string, nullable: true }

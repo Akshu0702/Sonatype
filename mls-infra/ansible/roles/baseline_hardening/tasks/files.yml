@@ -1,0 +1,50 @@
+---
+- name: Show the legal banner before login
+  ansible.builtin.copy:
+    content: "{{ baseline_hardening_banner }}"
+    dest: "{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - /etc/issue
+    - /etc/issue.net
+
+- name: Set a restrictive default umask
+  ansible.builtin.copy:
+    content: |
+      umask {{ baseline_hardening_umask }}
+    dest: /etc/profile.d/60-mls-umask.sh
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Disable core dumps
+  ansible.builtin.copy:
+    content: |
+      * hard core 0
+    dest: /etc/security/limits.d/60-mls-coredump.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Check which sensitive files exist
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - /etc/passwd
+    - /etc/group
+    - /etc/crontab
+    - /etc/ssh/sshd_config
+  register: baseline_hardening_sensitive_files
+
+- name: Set owner and permissions on sensitive files
+  ansible.builtin.file:
+    path: "{{ item.item }}"
+    owner: root
+    group: root
+    mode: "{{ '0644' if item.item in ['/etc/passwd', '/etc/group'] else '0600' }}"
+  loop: "{{ baseline_hardening_sensitive_files.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: item.stat.exists

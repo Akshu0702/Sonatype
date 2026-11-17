@@ -1,0 +1,7 @@
+cluster-autoscaler:
+  autoDiscovery:
+    clusterName: mls-eks-prod-lab-002
+  rbac:
+    serviceAccount:
+      annotations:
+        eks.amazonaws.com/role-arn: arn:aws:iam::<account-id>:role/mls-role-prod-lab2-cluster-autoscaler

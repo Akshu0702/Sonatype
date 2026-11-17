@@ -1,0 +1,15 @@
+---
+baseline_hardening_sshd_service: sshd
+baseline_hardening_chrony_service: chronyd
+baseline_hardening_chrony_conf: /etc/chrony.conf
+baseline_hardening_packages_present:
+  - chrony
+baseline_hardening_packages_absent:
+  - telnet
+  - rsh
+  - talk
+  - ypbind
+  - tftp
+  - xinetd
+baseline_hardening_update_packages:
+  - dnf-automatic

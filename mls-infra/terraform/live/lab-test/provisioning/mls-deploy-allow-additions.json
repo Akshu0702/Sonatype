@@ -1,0 +1,103 @@
+{
+  "Comment": "Statements to ADD to the policy mls-deploy-allow (a new version; keep what is there). Two existing statements also change: see iam-by-hand.md, step 1b and 1c.",
+  "Statement": [
+    {
+      "Sid": "StepFunctionsByPrefix",
+      "Effect": "Allow",
+      "Action": [
+        "states:CreateStateMachine",
+        "states:UpdateStateMachine",
+        "states:DeleteStateMachine",
+        "states:DescribeStateMachine",
+        "states:PublishStateMachineVersion",
+        "states:DeleteStateMachineVersion",
+        "states:ListStateMachineVersions",
+        "states:CreateStateMachineAlias",
+        "states:UpdateStateMachineAlias",
+        "states:DeleteStateMachineAlias",
+        "states:DescribeStateMachineAlias",
+        "states:ListStateMachineAliases",
+        "states:TagResource",
+        "states:UntagResource",
+        "states:ListTagsForResource"
+      ],
+      "Resource": [
+        "arn:aws:states:ap-south-1:096631344162:stateMachine:mls-*",
+        "arn:aws:states:ap-south-1:096631344162:stateMachine:mls-*:*"
+      ]
+    },
+    {
+      "Sid": "StepFunctionsListAndValidate",
+      "Effect": "Allow",
+      "Action": [
+        "states:ListStateMachines",
+        "states:ValidateStateMachineDefinition"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "ap-south-1"
+        }
+      }
+    },
+    {
+      "Sid": "LetStepFunctionsDeliverLogs",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogDelivery",
+        "logs:GetLogDelivery",
+        "logs:UpdateLogDelivery",
+        "logs:DeleteLogDelivery",
+        "logs:ListLogDeliveries",
+        "logs:PutResourcePolicy",
+        "logs:DescribeResourcePolicies"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "ap-south-1"
+        }
+      }
+    },
+    {
+      "Sid": "ImageBuilderByPrefix",
+      "Effect": "Allow",
+      "Action": "imagebuilder:*",
+      "Resource": [
+        "arn:aws:imagebuilder:ap-south-1:096631344162:component/mls-*",
+        "arn:aws:imagebuilder:ap-south-1:096631344162:image-recipe/mls-*",
+        "arn:aws:imagebuilder:ap-south-1:096631344162:infrastructure-configuration/mls-*",
+        "arn:aws:imagebuilder:ap-south-1:096631344162:distribution-configuration/mls-*",
+        "arn:aws:imagebuilder:ap-south-1:096631344162:image-pipeline/mls-*",
+        "arn:aws:imagebuilder:ap-south-1:096631344162:image/mls-*"
+      ]
+    },
+    {
+      "Sid": "ImageBuilderListAndReadManaged",
+      "Effect": "Allow",
+      "Action": [
+        "imagebuilder:List*",
+        "imagebuilder:GetImage",
+        "imagebuilder:GetComponent"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "ap-south-1"
+        }
+      }
+    }
+  ],
+  "ChangeToExistingStatement_ServiceLinkedRoles": {
+    "Sid": "ServiceLinkedRoles",
+    "Add to iam:AWSServiceName": [
+      "imagebuilder.amazonaws.com"
+    ]
+  },
+  "ChangeToExistingStatement_IamAttachOnlyApprovedPolicies": {
+    "Sid": "IamAttachOnlyApprovedPolicies",
+    "Add to iam:PolicyARN": [
+      "arn:aws:iam::aws:policy/EC2InstanceProfileForImageBuilder"
+    ]
+  }
+}

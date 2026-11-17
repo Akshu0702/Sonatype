@@ -1,0 +1,28 @@
+#!/bin/bash
+# Boot script for the build agent: installs the tools and the Azure Pipelines agent SOFTWARE.
+# It does NOT register the agent: registration needs a token that must never be in a script.
+# Register once from a Session Manager shell (see README.md). Log: /var/log/mls-bootstrap.log
+set -euxo pipefail
+exec > >(tee -a /var/log/mls-bootstrap.log) 2>&1
+export DEBIAN_FRONTEND=noninteractive
+
+apt-get update -y
+apt-get install -y --no-install-recommends ca-certificates curl unzip jq git docker.io docker-compose-v2 openjdk-21-jdk-headless maven python3-venv
+systemctl enable --now docker
+
+id azagent >/dev/null 2>&1 || useradd --create-home --shell /bin/bash azagent
+usermod -aG docker azagent
+install -d -o azagent -g azagent /opt/azagent
+
+cd /opt/azagent
+if [ ! -f ./config.sh ]; then
+  curl -fsSL -o agent.tar.gz "https://download.agent.dev.azure.com/agent/${agent_version}/vsts-agent-linux-x64-${agent_version}.tar.gz"
+  echo "${agent_sha256}  agent.tar.gz" | sha256sum -c -
+  tar xzf agent.tar.gz
+  rm -f agent.tar.gz
+  chown -R azagent:azagent /opt/azagent
+  ./bin/installdependencies.sh
+fi
+
+touch /var/lib/mls-bootstrap-done
+echo "mls build agent bootstrap finished"

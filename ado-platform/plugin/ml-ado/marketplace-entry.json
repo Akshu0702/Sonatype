@@ -1,0 +1,6 @@
+{
+  "name": "ml-ado",
+  "description": "Set up, work in and audit an Azure DevOps project the same way every time (AzureDevOps-Platform-v1): setup and auditor agents, work, pull request, release, wiki and audit skills, and guard hooks. Needs the adoctl command line.",
+  "version": "0.1.0",
+  "source": "./ml-ado"
+}

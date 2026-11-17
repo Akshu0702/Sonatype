@@ -1,0 +1,35 @@
+---
+- name: Make sure the drop-in directory for SSH settings exists
+  ansible.builtin.file:
+    path: /etc/ssh/sshd_config.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Make sure the main SSH configuration reads the drop-in directory
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^Include\s+/etc/ssh/sshd_config\.d/\*\.conf'
+    line: Include /etc/ssh/sshd_config.d/*.conf
+    insertbefore: BOF
+    create: false
+    owner: root
+    group: root
+    mode: "0600"
+  notify: Restart sshd
+
+- name: Install the SSH hardening settings
+  ansible.builtin.template:
+    src: sshd-hardening.conf.j2
+    dest: /etc/ssh/sshd_config.d/10-mls-hardening.conf
+    owner: root
+    group: root
+    mode: "0600"
+  notify: Restart sshd
+
+- name: Check that the SSH configuration is valid
+  ansible.builtin.command: sshd -t
+  changed_when: false
+  check_mode: false
+  when: baseline_hardening_validate_sshd | bool

@@ -1,0 +1,9 @@
+---
+auditd_manage_services: true
+auditd_max_log_file_mb: 32
+auditd_num_logs: 10
+auditd_max_log_file_action: rotate
+auditd_space_left_action: syslog
+auditd_admin_space_left_action: suspend
+# Make the rules immutable until reboot. Off by default: a change then needs a reboot.
+auditd_immutable: false

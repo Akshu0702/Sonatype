@@ -1,0 +1,71 @@
+# ci-mls-infra: checks for the mls-infra repository.
+# Pull requests are validated by the branch build-validation policy on main and develop.
+trigger:
+  branches:
+    include:
+      - develop
+      - release/*
+  paths:
+    exclude:
+      - '*.md'
+
+parameters:
+  # The self-hosted build agent in Mumbai. Set to an empty string to use Microsoft-hosted agents.
+  - name: agentPool
+    type: string
+    default: mls-agents
+
+variables:
+  # Scans run in report mode until findings are triaged. Set to 'true' per repository to block.
+  - name: securityEnforce
+    value: 'false'
+
+stages:
+  - stage: Checks
+    displayName: Checks
+    jobs:
+      - job: terraform
+        displayName: Terraform
+        pool:
+          ${{ if eq(parameters.agentPool, '') }}:
+            vmImage: ubuntu-24.04
+          ${{ if ne(parameters.agentPool, '') }}:
+            name: ${{ parameters.agentPool }}
+        steps:
+          - checkout: self
+          - template: templates/terraform-checks.yml
+
+      - job: ansible
+        displayName: Ansible
+        pool:
+          ${{ if eq(parameters.agentPool, '') }}:
+            vmImage: ubuntu-24.04
+          ${{ if ne(parameters.agentPool, '') }}:
+            name: ${{ parameters.agentPool }}
+        steps:
+          - checkout: self
+          - template: templates/ansible-checks.yml
+
+      - job: helm
+        displayName: Helm
+        pool:
+          ${{ if eq(parameters.agentPool, '') }}:
+            vmImage: ubuntu-24.04
+          ${{ if ne(parameters.agentPool, '') }}:
+            name: ${{ parameters.agentPool }}
+        steps:
+          - checkout: self
+          - template: templates/helm-checks.yml
+
+      - job: security
+        displayName: Security scans
+        pool:
+          ${{ if eq(parameters.agentPool, '') }}:
+            vmImage: ubuntu-24.04
+          ${{ if ne(parameters.agentPool, '') }}:
+            name: ${{ parameters.agentPool }}
+        steps:
+          - checkout: self
+          - template: templates/security-scan.yml
+            parameters:
+              enforce: ${{ variables.securityEnforce }}

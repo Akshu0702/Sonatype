@@ -1,0 +1,329 @@
+openapi: 3.0.3
+info:
+  title: Managed Lab provisioning API
+  version: 1.0.0
+  description: |
+    Request, inspect, extend and tear down on-demand test environments. The portal, the command line (`mls env ...`) and test
+    automation all use this one API.
+
+    **State: specified, not built.** Nothing implements this contract yet. The workflow behind it exists as two state machines
+    (`statemachines/provision-environment.asl.json`, `statemachines/ttl-reaper.asl.json`), tested with a local emulator and not yet run in AWS.
+
+    Rules (the server enforces them; the workflow enforces them again):
+    - A request without `configuration`, `ttl`-or-default, `ticket` and `owner` is rejected. No tag, no launch.
+    - The default life is 8 hours and the longest is 72 hours; a longer one needs a new ticket.
+    - Every call that changes something needs an `Idempotency-Key`. The same key with the same body returns the first answer and changes nothing;
+      the same key with a different body is a `409`.
+    - The caller needs the scope named on each operation, looked up in the portal's internal scope lookup (cached 15 seconds, fails closed).
+    - Quotas are enforced; a request over quota is a `429` problem response and raises an alarm.
+
+    How a request becomes an execution (implementation notes): the service creates `environmentId` (`env-` and 8 hex digits), converts `ttl`
+    to `ttlHours`, and starts the `dev` alias of `provision-environment` with
+    `{environmentId, configuration, owner, ticket, ttlHours}`. The execution name is `<ticket>-<environmentId>`, so history is found from the ticket.
+    Extend moves the `expires-at` and `ttl` tags of the instance (the workflow re-reads them when it wakes). Delete sets `expires-at` to now and
+    starts the `ttl-reaper`.
+  license:
+    name: Proprietary
+    url: https://dev.azure.com/ML-AIML-COE/Sonatype-MLS/_wiki/wikis/Sonatype-MLS.wiki/1/Home
+servers:
+  - url: https://provisioning.mls.internal/v1
+    description: Private API Gateway, reachable over the VPN and from inside the lab network only
+tags:
+  - name: Configurations
+    description: What can be asked for
+  - name: Environments
+    description: Request, inspect, extend and tear down
+security:
+  - bearerAuth: []
+paths:
+  /configurations:
+    get:
+      tags: [Configurations]
+      operationId: listConfigurations
+      summary: The priority configurations (operating system image, database engine and version)
+      description: Scope `environments.view`.
+      responses:
+        '200':
+          description: The catalogue
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Configuration' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /environments:
+    post:
+      tags: [Environments]
+      operationId: requestEnvironment
+      summary: Request an environment
+      description: |
+        Scope `environments.request`. Starts the provisioning workflow and returns at once: the environment is `requested` and becomes
+        `provisioning`, then `ready`. Poll `GET /environments/{id}`.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EnvironmentRequest' }
+            examples:
+              postgres:
+                summary: A hardened Ubuntu with PostgreSQL 16 for 8 hours
+                value: { configuration: ubuntu24-pg16, ttl: 8h, ticket: MLS-101, owner: qa-team }
+      responses:
+        '200':
+          description: The same Idempotency-Key and body were sent before; the first answer is returned and nothing changed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Environment' }
+        '202':
+          description: Accepted
+          headers:
+            Location:
+              description: Where to read the environment
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Environment' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+    get:
+      tags: [Environments]
+      operationId: listProvisionedEnvironments
+      summary: List environments
+      description: Scope `environments.view`. Limited to the environments the caller's groups can reach.
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/Status' }
+        - name: ticket
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: A page of environments
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Environment' }
+                  nextCursor: { type: string, nullable: true }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /environments/{environmentId}:
+    get:
+      tags: [Environments]
+      operationId: getProvisionedEnvironment
+      summary: Status, endpoints and expiry of one environment
+      description: Scope `environments.view`.
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentId'
+      responses:
+        '200':
+          description: The environment
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Environment' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    delete:
+      tags: [Environments]
+      operationId: tearDownEnvironment
+      summary: Tear an environment down now
+      description: Scope `environments.request`, and the caller must own the environment or hold `environments.admin`.
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '202':
+          description: Teardown started; the environment is `decommissioning`
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Environment' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /environments/{environmentId}/extend:
+    post:
+      tags: [Environments]
+      operationId: extendEnvironment
+      summary: Extend the life of an environment
+      description: |
+        Scope `environments.request`. Adds `ttl` to the current expiry. The new expiry may not be more than 72 hours after the environment
+        was requested, and a ticket is needed. Longer needs a new environment and a new ticket.
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ExtendRequest' }
+      responses:
+        '200':
+          description: The environment with its new expiry
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Environment' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /environments/{environmentId}/evidence:
+    get:
+      tags: [Environments]
+      operationId: getEnvironmentEvidence
+      summary: Creation and teardown evidence
+      description: Scope `environments.view`. What was launched, with which tags and image, and when and why it was removed.
+      parameters:
+        - $ref: '#/components/parameters/EnvironmentId'
+      responses:
+        '200':
+          description: The evidence
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Evidence' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Issued through single sign-on for people and by the identity provider's client credentials for automation. Scopes come from the database, never from the token.
+  parameters:
+    EnvironmentId:
+      name: environmentId
+      in: path
+      required: true
+      schema: { type: string, pattern: '^env-[a-z0-9-]{3,60}$' }
+      description: Environment identifier, for example `env-3fa91c07`.
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 8, maxLength: 64, pattern: '^[A-Za-z0-9_-]+$' }
+      description: Chosen by the caller. A repeat with the same body returns the first answer.
+  responses:
+    Problem:
+      description: A problem, as RFC 9457 `application/problem+json`
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+  schemas:
+    Status:
+      type: string
+      enum: [requested, provisioning, ready, decommissioning, decommissioned, failed]
+      description: |
+        `requested` the workflow was started; `provisioning` the instance is launching; `ready` it is running; `decommissioning` teardown
+        started; `decommissioned` the instance is terminated; `failed` the launch was refused or failed (see `statusReason`).
+    Configuration:
+      type: object
+      required: [key, description, instanceType, rootVolumeGb]
+      properties:
+        key: { type: string, example: ubuntu24-pg16 }
+        description: { type: string, example: Hardened Ubuntu 24.04 LTS with PostgreSQL 16 }
+        instanceType: { type: string, example: t3.small }
+        rootVolumeGb: { type: integer, example: 30 }
+        hardened:
+          type: boolean
+          description: False while environments still launch from the plain Ubuntu fallback image.
+    EnvironmentRequest:
+      type: object
+      required: [configuration, ticket, owner]
+      additionalProperties: false
+      properties:
+        configuration: { type: string, pattern: '^[a-z0-9][a-z0-9-]{1,40}$', example: ubuntu24-pg16 }
+        ttl:
+          type: string
+          pattern: '^[0-9]{1,2}h$'
+          default: 8h
+          description: Whole hours, 1h to 72h.
+          example: 8h
+        ticket: { type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$', example: MLS-101 }
+        owner:
+          type: string
+          pattern: '^[a-z0-9][a-z0-9-]{1,39}$'
+          description: A team or role, never a person or an email address.
+          example: qa-team
+    ExtendRequest:
+      type: object
+      required: [ttl, ticket]
+      additionalProperties: false
+      properties:
+        ttl: { type: string, pattern: '^[0-9]{1,2}h$', example: 4h }
+        ticket: { type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$', example: MLS-101 }
+    Environment:
+      type: object
+      required: [id, configuration, status, ticket, owner, requestedAt]
+      properties:
+        id: { type: string, example: env-3fa91c07 }
+        configuration: { type: string, example: ubuntu24-pg16 }
+        status: { $ref: '#/components/schemas/Status' }
+        statusReason: { type: string, nullable: true }
+        ticket: { type: string }
+        owner: { type: string }
+        instanceId: { type: string, nullable: true, example: i-0123456789abcdef0 }
+        privateIp: { type: string, nullable: true }
+        endpoints:
+          type: object
+          additionalProperties: { type: string }
+          description: Where the environment can be reached, for example the Session Manager command. Never secrets.
+        requestedAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time, nullable: true }
+        executionArn: { type: string, nullable: true }
+    Evidence:
+      type: object
+      required: [environmentId, events]
+      properties:
+        environmentId: { type: string }
+        events:
+          type: array
+          items:
+            type: object
+            required: [at, type]
+            properties:
+              at: { type: string, format: date-time }
+              type: { type: string, enum: [requested, launched, extended, expired, torn_down, failed] }
+              detail:
+                type: object
+                additionalProperties: true
+                description: Image id, instance type, tags, who asked, and why it ended.
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type: { type: string, example: 'https://wiki.mls.internal/problems/ttl-too-long' }
+        title: { type: string, example: The requested life is longer than allowed }
+        status: { type: integer, example: 422 }
+        detail: { type: string }
+        code:
+          type: string
+          example: ttl_too_long
+          description: A stable code for callers (invalid_request, unknown_configuration, ttl_too_long, over_quota, idempotency_conflict).
+        requestId: { type: string, nullable: true }

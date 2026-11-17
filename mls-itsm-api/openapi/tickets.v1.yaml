@@ -1,0 +1,386 @@
+openapi: 3.0.3
+info:
+  title: MLS ITSM API
+  version: 1.0.0
+  description: |
+    The ITSM Product's own API: tickets for on-demand lab environments, with approval. Every call needs a bearer token from the caller's tenant
+    realm and the matching feature (key itsm.group.name) live for that tenant; when it is off the answer is 404, as if the call did not exist.
+  license:
+    name: Proprietary
+    url: https://www.motivitylabs.com
+servers:
+  - url: /api/v1
+security:
+  - bearer: []
+tags:
+  - name: tickets
+    description: Raising, viewing and moving tickets
+  - name: approvals
+    description: The approval queue and decisions
+paths:
+  /configurations:
+    get:
+      tags: [tickets]
+      operationId: listConfigurations
+      summary: The environment configurations a ticket may ask for
+      description: Feature itsm.tickets.tickets_create_provisioning.
+      responses:
+        '200':
+          description: The configuration names
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotAvailable'
+  /tickets:
+    get:
+      tags: [tickets]
+      operationId: listTickets
+      summary: The caller's tickets, or every ticket of the tenant (approvers)
+      description: Feature itsm.tickets.tickets_view_own. scope=all also needs itsm.tickets.tickets_view_all and the approver role.
+      parameters:
+        - name: scope
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [mine, all]
+            default: mine
+      responses:
+        '200':
+          description: Tickets, newest first, at most 200
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Ticket'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/NotAvailable'
+    post:
+      tags: [tickets]
+      operationId: raiseTicket
+      summary: Raise a ticket and upload the build ZIP
+      description: Features itsm.tickets.tickets_create_provisioning and itsm.tickets.tickets_attach. The ticket goes straight to PENDING_APPROVAL.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [title, config, build]
+              properties:
+                title:
+                  type: string
+                  minLength: 3
+                  maxLength: 200
+                description:
+                  type: string
+                  maxLength: 8000
+                config:
+                  type: string
+                  description: One of the names from GET /configurations
+                ttlHours:
+                  type: integer
+                  minimum: 1
+                  maximum: 72
+                  default: 8
+                build:
+                  type: string
+                  format: binary
+                  description: A ZIP file (content type application/zip), at most 100 MB
+      responses:
+        '201':
+          description: The ticket
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticket'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotAvailable'
+        '413':
+          $ref: '#/components/responses/Problem'
+  /tickets/{id}:
+    get:
+      tags: [tickets]
+      operationId: getTicket
+      summary: One ticket with its history
+      description: Feature itsm.tickets.tickets_view_own. The requester and approvers can see it; anyone else gets 404.
+      parameters:
+        - $ref: '#/components/parameters/TicketId'
+      responses:
+        '200':
+          description: The ticket, its history and whether the caller may decide it
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotAvailable'
+  /tickets/{id}/refresh:
+    post:
+      tags: [tickets]
+      operationId: refreshTicket
+      summary: Ask for the environment of an approved ticket, or check whether it is ready
+      description: Feature itsm.tickets.tickets_view_own. Safe to repeat.
+      parameters:
+        - $ref: '#/components/parameters/TicketId'
+      responses:
+        '200':
+          description: The ticket as it now is
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticket'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotAvailable'
+  /tickets/{id}/transitions:
+    post:
+      tags: [tickets]
+      operationId: moveTicket
+      summary: Move a ticket to TESTING, REPORTED or CLOSED
+      description: Feature itsm.tickets.tickets_transition. Only the moves of the lifecycle are allowed; others answer 409.
+      parameters:
+        - $ref: '#/components/parameters/TicketId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [to]
+              properties:
+                to:
+                  type: string
+                  enum: [TESTING, REPORTED, CLOSED]
+                comment:
+                  type: string
+      responses:
+        '200':
+          description: The ticket as it now is
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticket'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotAvailable'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /approvals:
+    get:
+      tags: [approvals]
+      operationId: approvalQueue
+      summary: Tickets waiting for a decision, other than the caller's own
+      description: Feature itsm.approvals.approvals_queue. Approvers only.
+      responses:
+        '200':
+          description: Tickets in PENDING_APPROVAL, oldest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Ticket'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/NotAvailable'
+  /tickets/{id}/approve:
+    post:
+      tags: [approvals]
+      operationId: approveTicket
+      summary: Approve a ticket; the environment is then requested
+      description: Feature itsm.approvals.approvals_decide. Approvers only, and never the requester.
+      parameters:
+        - $ref: '#/components/parameters/TicketId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Decision'
+      responses:
+        '200':
+          description: The ticket as it now is
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticket'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/NotAvailable'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /tickets/{id}/reject:
+    post:
+      tags: [approvals]
+      operationId: rejectTicket
+      summary: Reject a ticket, with a reason
+      description: Feature itsm.approvals.approvals_decide. Approvers only, and never the requester.
+      parameters:
+        - $ref: '#/components/parameters/TicketId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Decision'
+      responses:
+        '200':
+          description: The ticket as it now is
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticket'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/NotAvailable'
+        '409':
+          $ref: '#/components/responses/Problem'
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    TicketId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    Unauthorized:
+      description: No valid token
+    NotAvailable:
+      description: No such ticket, or the Product feature is not live for this tenant
+    Problem:
+      description: The request was refused; the body says why
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    Problem:
+      type: object
+      properties:
+        status:
+          type: integer
+        detail:
+          type: string
+    Decision:
+      type: object
+      properties:
+        comment:
+          type: string
+          maxLength: 2000
+    Build:
+      type: object
+      properties:
+        name:
+          type: string
+        sha256:
+          type: string
+        size:
+          type: integer
+          format: int64
+    Ticket:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        reference:
+          type: string
+          example: TKT-1001
+        number:
+          type: integer
+          format: int64
+        title:
+          type: string
+        description:
+          type: string
+        requester:
+          type: string
+        requesterName:
+          type: string
+        state:
+          type: string
+          enum: [RAISED, PENDING_APPROVAL, APPROVED, REJECTED, PROVISIONING, ACTIVE, TESTING, REPORTED, CLOSED]
+        config:
+          type: string
+        ttlHours:
+          type: integer
+        build:
+          $ref: '#/components/schemas/Build'
+        environmentRef:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    Event:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        at:
+          type: string
+          format: date-time
+        actor:
+          type: string
+        action:
+          type: string
+        from:
+          type: string
+        to:
+          type: string
+        comment:
+          type: string
+    Detail:
+      type: object
+      properties:
+        ticket:
+          $ref: '#/components/schemas/Ticket'
+        history:
+          type: array
+          items:
+            $ref: '#/components/schemas/Event'
+        canDecide:
+          type: boolean

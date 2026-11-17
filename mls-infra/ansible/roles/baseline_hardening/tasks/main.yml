@@ -1,0 +1,48 @@
+---
+- name: Load the variables for this operating system family
+  ansible.builtin.include_vars: "{{ ansible_facts['os_family'] }}.yml"
+  tags: [always]
+
+- name: Make sure the drop-in directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - /etc/sysctl.d
+    - /etc/modprobe.d
+    - /etc/profile.d
+    - /etc/security/limits.d
+    - /etc/systemd/journald.conf.d
+  tags: [always]
+
+- name: Harden SSH
+  ansible.builtin.import_tasks: ssh.yml
+  tags: [ssh]
+
+- name: Harden kernel network settings and disable unused modules
+  ansible.builtin.import_tasks: kernel.yml
+  tags: [kernel]
+
+- name: Manage packages
+  ansible.builtin.import_tasks: packages.yml
+  tags: [packages]
+
+- name: Configure time synchronisation
+  ansible.builtin.import_tasks: time.yml
+  tags: [time]
+
+- name: Configure automatic security updates
+  ansible.builtin.import_tasks: updates.yml
+  tags: [updates]
+  when: baseline_hardening_auto_updates | bool
+
+- name: Set file permissions, banner and umask
+  ansible.builtin.import_tasks: files.yml
+  tags: [files]
+
+- name: Configure persistent journal
+  ansible.builtin.import_tasks: logging.yml
+  tags: [logging]

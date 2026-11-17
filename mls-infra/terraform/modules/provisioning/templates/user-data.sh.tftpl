@@ -1,0 +1,11 @@
+#!/bin/bash
+# Boot script of a provisioned environment. Log: /var/log/mls-env-boot.log
+set -euo pipefail
+exec > >(tee -a /var/log/mls-env-boot.log) 2>&1
+%{ if postgres_package != "" ~}
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -y
+apt-get install -y --no-install-recommends ${postgres_package}
+systemctl enable --now postgresql
+%{ endif ~}
+touch /var/lib/mls-env-boot-done

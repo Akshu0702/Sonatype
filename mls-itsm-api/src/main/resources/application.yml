@@ -1,0 +1,44 @@
+server:
+  port: ${PORT:8082}
+  servlet:
+    context-path: /api/v1
+  shutdown: graceful
+spring:
+  application:
+    name: mls-itsm-api
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/itsm}
+    username: ${DB_USER:itsm}
+    password: ${DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: 10
+  flyway:
+    enabled: true
+  servlet:
+    multipart:
+      max-file-size: ${ITSM_UPLOAD_MAX:100MB}
+      max-request-size: ${ITSM_UPLOAD_MAX_REQUEST:101MB}
+  jackson:
+    default-property-inclusion: non_null
+platform:
+  tenants:
+    url: ${TENANTS_URL:http://localhost:8081}
+  # Set this when the IAM service is available: the permission itsm.approvals.decide then decides who may approve.
+  # iam:
+  #   url: ${IAM_URL}
+itsm:
+  storage-dir: ${ITSM_STORAGE_DIR:./data/builds}
+  upload-max-bytes: ${ITSM_UPLOAD_MAX_BYTES:104857600}
+  # People (token subject or user name) who may approve until the IAM service holds the approver role.
+  approvers: ${ITSM_APPROVERS:}
+  # Browser origins that may call this API directly (the console), e.g. https://console.example.com. Empty = none.
+  cors-origins: ${ITSM_CORS_ORIGINS:}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true

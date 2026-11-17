@@ -1,0 +1,16 @@
+---
+- name: Configure time synchronisation
+  ansible.builtin.template:
+    src: chrony.conf.j2
+    dest: "{{ baseline_hardening_chrony_conf }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart chrony
+
+- name: Make sure time synchronisation runs
+  ansible.builtin.service:
+    name: "{{ baseline_hardening_chrony_service }}"
+    state: started
+    enabled: true
+  when: baseline_hardening_manage_services | bool

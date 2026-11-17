@@ -1,0 +1,34 @@
+# Build and test a Java service or library: Maven, JDK 21 and PostgreSQL 16, all in containers, so the agent needs only Docker.
+# The repository supplies scripts/test.sh (it starts a throwaway PostgreSQL, runs `mvn verify` in the Maven image and removes both).
+#
+# Use, in the repository's own pipeline file:
+#   resources:
+#     repositories:
+#       - repository: infra
+#         type: git
+#         name: mls-infra
+#   ...
+#   steps:
+#     - checkout: self
+#     - template: pipelines/templates/ci-java-api.yml@infra
+parameters:
+  - name: testScript
+    type: string
+    default: scripts/test.sh
+
+steps:
+  - script: bash ${{ parameters.testScript }}
+    displayName: Build and test (Maven, JDK 21, PostgreSQL 16 in containers)
+  - task: PublishTestResults@2
+    displayName: Publish test results
+    condition: succeededOrFailed()
+    inputs:
+      testResultsFormat: JUnit
+      testResultsFiles: '**/surefire-reports/TEST-*.xml'
+      searchFolder: $(Build.SourcesDirectory)
+      mergeTestResults: true
+      testRunTitle: ${{ variables['Build.DefinitionName'] }}
+  # The containers run as root and leave root-owned files (target/) in the checkout; hand them back to the agent user.
+  - script: docker run --rm -v "$(Build.SourcesDirectory):/w" alpine:3.20 chown -R "`id -u`:`id -g`" /w
+    displayName: Hand the workspace back to the agent user
+    condition: always()

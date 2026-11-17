@@ -1,0 +1,171 @@
+{
+  "Comment": "Safety net behind provision-environment: finds instances this platform launched (tags project=mls, managed-by=provisioning) whose expires-at tag has passed and terminates them. Started every 15 minutes by EventBridge Scheduler, and on demand to tear an environment down now (set expires-at to the current time, then start this). An instance with no expires-at tag is never terminated; the run fails instead so the failed-execution alarm tells a person.",
+  "QueryLanguage": "JSONata",
+  "StartAt": "Init",
+  "TimeoutSeconds": 900,
+  "States": {
+    "Init": {
+      "Type": "Pass",
+      "Assign": {
+        "expired": [],
+        "untagged": [],
+        "nextToken": ""
+      },
+      "Next": "FindManagedInstances"
+    },
+    "FindManagedInstances": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:ec2:describeInstances",
+      "Arguments": {
+        "Filters": [
+          {
+            "Name": "tag:managed-by",
+            "Values": [
+              "provisioning"
+            ]
+          },
+          {
+            "Name": "tag:project",
+            "Values": [
+              "mls"
+            ]
+          },
+          {
+            "Name": "instance-state-name",
+            "Values": [
+              "pending",
+              "running",
+              "stopping",
+              "stopped"
+            ]
+          }
+        ],
+        "MaxResults": 200
+      },
+      "TimeoutSeconds": 60,
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Ec2.Ec2Exception",
+            "States.Timeout"
+          ],
+          "IntervalSeconds": 5,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Assign": {
+        "expired": "{% $append($expired, $states.result.Reservations.Instances[$exists(Tags[Key = 'expires-at'].Value) and $toMillis(Tags[Key = 'expires-at'].Value) <= $toMillis($now())].InstanceId[]) %}",
+        "untagged": "{% $append($untagged, $states.result.Reservations.Instances[$not($exists(Tags[Key = 'expires-at']))].InstanceId[]) %}",
+        "nextToken": "{% $exists($states.result.NextToken) ? $states.result.NextToken : '' %}"
+      },
+      "Next": "MorePages"
+    },
+    "FindNextPage": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:ec2:describeInstances",
+      "Arguments": {
+        "Filters": [
+          {
+            "Name": "tag:managed-by",
+            "Values": [
+              "provisioning"
+            ]
+          },
+          {
+            "Name": "tag:project",
+            "Values": [
+              "mls"
+            ]
+          },
+          {
+            "Name": "instance-state-name",
+            "Values": [
+              "pending",
+              "running",
+              "stopping",
+              "stopped"
+            ]
+          }
+        ],
+        "MaxResults": 200,
+        "NextToken": "{% $nextToken %}"
+      },
+      "TimeoutSeconds": 60,
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Ec2.Ec2Exception",
+            "States.Timeout"
+          ],
+          "IntervalSeconds": 5,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Assign": {
+        "expired": "{% $append($expired, $states.result.Reservations.Instances[$exists(Tags[Key = 'expires-at'].Value) and $toMillis(Tags[Key = 'expires-at'].Value) <= $toMillis($now())].InstanceId[]) %}",
+        "untagged": "{% $append($untagged, $states.result.Reservations.Instances[$not($exists(Tags[Key = 'expires-at']))].InstanceId[]) %}",
+        "nextToken": "{% $exists($states.result.NextToken) ? $states.result.NextToken : '' %}"
+      },
+      "Next": "MorePages",
+      "Comment": "Same as the first page, with the token from the previous one."
+    },
+    "MorePages": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Condition": "{% $nextToken != '' %}",
+          "Next": "FindNextPage"
+        },
+        {
+          "Condition": "{% $count($expired) > 0 %}",
+          "Next": "TerminateExpired"
+        }
+      ],
+      "Default": "AnyUntagged"
+    },
+    "TerminateExpired": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:ec2:terminateInstances",
+      "Comment": "At most 100 per run; the next run takes the rest.",
+      "Arguments": {
+        "InstanceIds": "{% $expired[[0..99]][] %}"
+      },
+      "TimeoutSeconds": 60,
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Ec2.Ec2Exception",
+            "States.Timeout"
+          ],
+          "IntervalSeconds": 10,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Next": "AnyUntagged"
+    },
+    "AnyUntagged": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Condition": "{% $count($untagged) > 0 %}",
+          "Next": "UntaggedInstances"
+        }
+      ],
+      "Default": "Done"
+    },
+    "UntaggedInstances": {
+      "Type": "Fail",
+      "Error": "UntaggedManagedInstances",
+      "Cause": "Instances marked as managed by provisioning have no expires-at tag. They were left alone. A person must tag or remove them."
+    },
+    "Done": {
+      "Type": "Succeed",
+      "Output": {
+        "terminated": "{% $count($expired[[0..99]][]) %}"
+      }
+    }
+  }
+}

@@ -1,0 +1,48 @@
+---
+- name: Load the variables for this operating system family
+  ansible.builtin.include_vars: "{{ ansible_facts['os_family'] }}.yml"
+
+- name: Install the audit daemon
+  ansible.builtin.package:
+    name: "{{ auditd_package }}"
+    state: present
+
+- name: Configure the audit daemon
+  ansible.builtin.lineinfile:
+    path: /etc/audit/auditd.conf
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    owner: root
+    group: root
+    mode: "0640"
+  loop:
+    - { regexp: '^max_log_file\s*=', line: "max_log_file = {{ auditd_max_log_file_mb }}" }
+    - { regexp: '^num_logs\s*=', line: "num_logs = {{ auditd_num_logs }}" }
+    - { regexp: '^max_log_file_action\s*=', line: "max_log_file_action = {{ auditd_max_log_file_action }}" }
+    - { regexp: '^space_left_action\s*=', line: "space_left_action = {{ auditd_space_left_action }}" }
+    - { regexp: '^admin_space_left_action\s*=', line: "admin_space_left_action = {{ auditd_admin_space_left_action }}" }
+  notify: Restart auditd
+
+- name: Make sure the audit rules directory exists
+  ansible.builtin.file:
+    path: /etc/audit/rules.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: Install the audit rules
+  ansible.builtin.template:
+    src: mls.rules.j2
+    dest: /etc/audit/rules.d/60-mls.rules
+    owner: root
+    group: root
+    mode: "0640"
+  notify: Load audit rules
+
+- name: Make sure the audit daemon runs
+  ansible.builtin.service:
+    name: "{{ auditd_service }}"
+    state: started
+    enabled: true
+  when: auditd_manage_services | bool

@@ -1,0 +1,17 @@
+---
+- name: Install kernel network and memory settings
+  ansible.builtin.template:
+    src: sysctl-hardening.conf.j2
+    dest: /etc/sysctl.d/60-mls-hardening.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload sysctl
+
+- name: Disable kernel modules a server does not need
+  ansible.builtin.template:
+    src: modprobe-hardening.conf.j2
+    dest: /etc/modprobe.d/60-mls-hardening.conf
+    owner: root
+    group: root
+    mode: "0644"

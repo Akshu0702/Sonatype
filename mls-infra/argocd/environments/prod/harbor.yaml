@@ -1,0 +1,25 @@
+# Harbor of prod. It holds the images: it never prunes and never syncs by itself, in either environment.
+# For the prod cluster's OWN Argo CD only; not applied anywhere.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: harbor
+  namespace: argocd
+  labels:
+    env: prod
+spec:
+  project: platform-prod
+  source:
+    repoURL: https://dev.azure.com/ML-AIML-COE/Sonatype-MLS/_git/mls-infra
+    targetRevision: develop
+    path: helm/platform/charts/harbor
+    helm:
+      valueFiles:
+        - "../../values/prod/harbor.yaml"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: harbor
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

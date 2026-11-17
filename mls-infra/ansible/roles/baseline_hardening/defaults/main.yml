@@ -1,0 +1,40 @@
+---
+# Set to false where there is no init system or writable kernel settings (for example a container test).
+baseline_hardening_manage_services: true
+baseline_hardening_apply_sysctl: true
+baseline_hardening_validate_sshd: true
+
+# SSH
+baseline_hardening_ssh_max_auth_tries: 4
+baseline_hardening_ssh_login_grace_time: 60
+baseline_hardening_ssh_client_alive_interval: 300
+baseline_hardening_ssh_client_alive_count_max: 2
+baseline_hardening_ssh_allow_groups: []
+
+# Network. Hosts that run containers or route traffic need forwarding.
+baseline_hardening_allow_ip_forwarding: false
+
+# Time: the Amazon Time Sync Service is reachable from every EC2 instance.
+baseline_hardening_ntp_servers:
+  - 169.254.169.123
+
+# Legal banner shown before login.
+baseline_hardening_banner: |
+  Authorised use only. Activity on this system is monitored and recorded.
+
+# Kernel modules that are not needed on a server.
+baseline_hardening_disabled_modules:
+  - cramfs
+  - freevxfs
+  - hfs
+  - hfsplus
+  - jffs2
+  - udf
+  - usb-storage
+  - dccp
+  - sctp
+  - rds
+  - tipc
+
+baseline_hardening_umask: "027"
+baseline_hardening_auto_updates: true

@@ -1,0 +1,11 @@
+metrics-server:
+  replicas: 2
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+  nodeSelector:
+    workload: system
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi

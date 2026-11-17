@@ -1,0 +1,55 @@
+# console-ui in uat. Rendered by helm/platform/charts/mls-service. Nothing for uat exists in AWS yet: these are values for a cluster that has not been built.
+# image.tag is written by the promote step (a pull request): "unpromoted" means no image has been promoted to this environment.
+# Names ending in .mls.internal are placeholders until the private DNS zone is decided.
+image:
+  repository: harbor.uat.mls.internal/mls/console-ui
+  tag: unpromoted
+pullSecret:
+  remoteRef: mls/uat/harbor/pull-robot
+  registry: harbor.uat.mls.internal
+port: 8080
+healthPath: /
+# Only the console is exposed: it proxies /api and /itsm/api to the services inside the cluster, so no other service has an address outside it.
+externalSecret:
+  enabled: false
+tmpDirs:
+  - /tmp
+  - /var/cache/nginx
+configFiles:
+  enabled: true
+  mountPath: /config
+  files:
+    default.conf: |
+      server {
+        listen 8080;
+        root /usr/share/nginx/html;
+        client_max_body_size 101m;
+        location /api/ { proxy_pass http://portal-api; proxy_set_header Host $host; }
+        location /itsm/api/ { proxy_pass http://itsm-api/api/; proxy_set_header Host $host; proxy_request_buffering off; }
+        location / { try_files $uri /index.html; }
+      }
+    config.json: |
+      {
+        "authUrl": "https://auth.uat.mls.internal",
+        "realm": "motivity-lab",
+        "itsmApiUrl": "/itsm/api"
+      }
+extraVolumeMounts:
+  - { name: files, mountPath: /etc/nginx/conf.d/default.conf, subPath: default.conf, readOnly: true }
+  - { name: files, mountPath: /usr/share/nginx/html/config.json, subPath: config.json, readOnly: true }
+resources:
+  requests: { cpu: 50m, memory: 64Mi }
+  limits: { memory: 128Mi }
+ingress:
+  enabled: true
+  host: console.uat.mls.internal
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internal
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/group.name: mls-uat
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/certificate-arn: REPLACE_WITH_CERTIFICATE_ARN
+    alb.ingress.kubernetes.io/healthcheck-path: /
+autoscaling:
+  minReplicas: 2
+  maxReplicas: 4

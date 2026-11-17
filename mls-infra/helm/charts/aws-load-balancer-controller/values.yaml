@@ -1,0 +1,3 @@
+# Intentionally empty. Settings live in helm/values/base/aws-load-balancer-controller.yaml and helm/values/<env>/aws-load-balancer-controller.yaml,
+# nested under the upstream chart's name (aws-load-balancer-controller:).
+{}

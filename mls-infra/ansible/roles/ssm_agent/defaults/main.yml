@@ -1,0 +1,4 @@
+---
+# Fail the run if no Systems Manager agent service is found. The agent ships in the standard Amazon Linux and
+# Ubuntu AMIs, so a missing agent means the image is wrong.
+ssm_agent_require_present: true

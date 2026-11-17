@@ -1,0 +1,9 @@
+apiVersion: v2
+name: harbor
+description: Harbor, the container registry of an environment. A wrapper around the upstream chart that adds its service account (S3 through an IAM role) and its secrets (from Secrets Manager).
+type: application
+version: 0.1.0
+dependencies:
+  - name: harbor
+    version: 1.19.4
+    repository: https://helm.goharbor.io

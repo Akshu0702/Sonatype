@@ -1,0 +1,87 @@
+# Defaults shared by every environment. Environment values (helm/platform/values/<env>/harbor.yaml) set the addresses and the account.
+registryServiceAccount:
+  name: harbor-registry
+  roleArn: "" # eks.amazonaws.com/role-arn: the IAM role from the Terraform output harbor_role_arn
+externalSecrets:
+  storeName: aws-secrets-manager
+  refreshInterval: 1h
+  adminPassword: "" # secret name, mls/<env>/harbor/admin-password
+  databasePassword: "" # secret name, mls/<env>/harbor/db-password
+  coreSecretKey: "" # secret name, mls/<env>/harbor/secret-key
+
+harbor:
+  # TLS ends at the internal load balancer; Harbor itself speaks plain HTTP inside the cluster.
+  expose:
+    type: ingress
+    tls:
+      enabled: false
+    ingress:
+      hosts:
+        core: ""
+      controller: alb
+      className: alb
+      annotations: {}
+  externalURL: ""
+
+  # Image data goes to S3 with the registry's IAM role (no access keys). Metadata goes to the external PostgreSQL (RDS).
+  persistence:
+    enabled: true
+    resourcePolicy: keep
+    persistentVolumeClaim:
+      redis: { storageClass: gp3, size: 2Gi }
+      trivy: { storageClass: gp3, size: 10Gi }
+    imageChartStorage:
+      type: s3
+      s3:
+        region: ap-south-1
+        bucket: ""
+        encrypt: true
+        keyid: ""
+        v4auth: true
+        secure: true
+
+  existingSecretAdminPassword: harbor-admin
+  existingSecretAdminPasswordKey: HARBOR_ADMIN_PASSWORD
+  existingSecretSecretKey: harbor-core-secret-key
+
+  database:
+    type: external
+    external:
+      host: ""
+      port: "5432"
+      username: harbor
+      coreDatabase: registry
+      existingSecret: harbor-db
+      sslmode: require
+
+  # The bundled cache (Valkey, a Redis-compatible store) is ONE instance: Harbor is highly available at the application tier
+  # (core, registry and portal run two replicas) but not at the cache. ADR-0012 excludes a shared Redis for the platform; this one is
+  # part of Harbor. If the cache is lost, Harbor restarts it and goes on: the data is in S3 and PostgreSQL.
+  redis:
+    type: internal
+
+  # Scanning on push with Trivy, built into Harbor. The vulnerability database is fetched through the NAT gateway.
+  trivy:
+    enabled: true
+    vulnType: "os,library"
+    severity: "UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL"
+    skipUpdate: false
+
+  jobservice:
+    jobLoggers:
+      - database
+    replicas: 1
+
+  core:
+    replicas: 2
+    podDisruptionBudget: { enabled: true, minAvailable: 1 }
+  registry:
+    replicas: 2
+    serviceAccountName: harbor-registry
+    automountServiceAccountToken: true
+    podDisruptionBudget: { enabled: true, minAvailable: 1 }
+  portal:
+    replicas: 2
+    podDisruptionBudget: { enabled: true, minAvailable: 1 }
+  metrics:
+    enabled: false

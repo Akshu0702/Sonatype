@@ -1,0 +1,24 @@
+server:
+  port: ${PORT:8080}
+  servlet:
+    context-path: /api/v1
+  shutdown: graceful
+spring:
+  application:
+    name: mls-portal-api
+platform:
+  tenants:
+    url: ${TENANTS_URL:http://localhost:8081}
+mls:
+  aws:
+    region: ${MLS_AWS_REGION:ap-south-1}
+    project-tag: ${MLS_AWS_PROJECT_TAG:mls}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true

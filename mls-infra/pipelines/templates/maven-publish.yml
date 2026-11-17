@@ -1,0 +1,51 @@
+# Publish the tested build to the Azure Artifacts feed mls-maven (project Sonatype-MLS). Run after maven-version.yml and after the tests passed.
+#   snapshot (develop)        -> stays in @Local
+#   rc (release/X.Y.Z)        -> promoted to @Prerelease, and the tag vX.Y.Z-rc.N is created on this commit
+# Releases are never built: promote-release.yml moves the tested rc to @Release unchanged (build once, promote).
+# Maven runs in a container (the agent needs only Docker); the feed token lives in a file inside that throwaway container only.
+parameters:
+  - name: dir            # the project to publish
+    type: string
+  - name: commonsDir     # a checkout of mls-commons-lib that the project needs in order to compile; empty for the library itself
+    type: string
+    default: ''
+steps:
+  - script: |
+      set -euo pipefail
+      FEED=https://pkgs.dev.azure.com/ML-AIML-COE/Sonatype-MLS/_packaging/mls-maven/maven/v1
+      read -r -d '' INSIDE <<'SCRIPT' || true
+      set -euo pipefail
+      cat > /tmp/settings.xml <<XML
+      <settings><servers><server><id>mls-maven</id><username>build</username><password>${FEED_TOKEN}</password></server></servers></settings>
+      XML
+      if [ -d /commons ]; then mvn -B -ntp -q -f /commons/pom.xml -DskipTests install; fi
+      cd /work
+      if [ -n "${MVN_VERSION:-}" ]; then mvn -B -ntp -q versions:set -DnewVersion="$MVN_VERSION" -DgenerateBackupPoms=false; fi
+      mvn -B -ntp -s /tmp/settings.xml deploy -DskipTests -DaltDeploymentRepository="mls-maven::${FEED_URL}"
+      SCRIPT
+      COMMONS="${{ parameters.commonsDir }}"
+      docker run --rm -v "${{ parameters.dir }}:/work" ${COMMONS:+-v "$COMMONS:/commons"} -v mls-m2:/root/.m2 -w /work \
+        -e FEED_TOKEN -e FEED_URL="$FEED" -e MVN_VERSION="$(mvnVersion)" maven:3.9-eclipse-temurin-21 bash -c "$INSIDE"
+    displayName: Publish to feed mls-maven
+    condition: and(succeeded(), or(eq(variables.mvnChannel, 'snapshot'), eq(variables.mvnChannel, 'rc')))
+    env: { FEED_TOKEN: $(System.AccessToken) }
+  - script: |
+      set -euo pipefail
+      cd "${{ parameters.dir }}"
+      # the version Maven just published, read from the pom (the rc version was set inside the container, so read the module from the feed's name)
+      G=$(sed -n 's:.*<groupId>\(.*\)</groupId>.*:\1:p' pom.xml | sed -n 2p)
+      A=$(sed -n 's:.*<artifactId>\(.*\)</artifactId>.*:\1:p' pom.xml | sed -n 2p)
+      V="$(mvnVersion)"
+      curl -sf -X PATCH -H "Authorization: Bearer $SYSTEM_ACCESSTOKEN" -H 'Content-Type: application/json' \
+        "https://pkgs.dev.azure.com/ML-AIML-COE/Sonatype-MLS/_apis/packaging/feeds/mls-maven/maven/groups/$G/artifacts/$A/versions/$V?api-version=7.1-preview.1" \
+        -d '{"views":{"op":"add","path":"/views/-","value":"Prerelease"}}'
+      git -c user.name="MLS CI" -c user.email=ci@mls.invalid tag -a "v$V" -m "Release candidate $V"
+      git -c http.extraheader="AUTHORIZATION: bearer $SYSTEM_ACCESSTOKEN" push origin "v$V"
+      echo "promoted $G:$A:$V to @Prerelease and tagged v$V"
+    displayName: Promote rc to @Prerelease and tag
+    condition: and(succeeded(), eq(variables.mvnChannel, 'rc'))
+    env: { SYSTEM_ACCESSTOKEN: $(System.AccessToken) }
+  # The container runs as root and leaves root-owned files (target/, the version change in the pom); hand them back to the agent user.
+  - script: docker run --rm -v "${{ parameters.dir }}:/w" alpine:3.20 chown -R "`id -u`:`id -g`" /w
+    displayName: Hand the workspace back to the agent user
+    condition: always()

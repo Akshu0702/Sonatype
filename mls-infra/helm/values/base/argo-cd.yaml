@@ -1,0 +1,21 @@
+argo-cd:
+  global:
+    nodeSelector:
+      workload: system
+  controller:
+    replicas: 1
+  server:
+    replicas: 2
+  repoServer:
+    replicas: 2
+  applicationSet:
+    replicas: 1
+  dex:
+    enabled: false
+  notifications:
+    enabled: false
+  # Argo CD keeps its own cache (ADR-0012: no shared Redis). A single instance, not the HA variant.
+  redis:
+    enabled: true
+  redis-ha:
+    enabled: false

@@ -1,0 +1,31 @@
+# Harbor in prod. Nothing for prod exists in AWS yet: these are values for a cluster that has not been built.
+# Replace the REPLACE_* values from the Terraform outputs of terraform/live/prod once that stack has been applied.
+registryServiceAccount:
+  roleArn: arn:aws:iam::096631344162:role/mls-role-prod-harbor
+externalSecrets:
+  adminPassword: mls/prod/harbor/admin-password
+  databasePassword: mls/prod/harbor/db-password
+  coreSecretKey: mls/prod/harbor/secret-key
+
+harbor:
+  externalURL: https://harbor.prod.mls.internal
+  expose:
+    ingress:
+      hosts:
+        core: harbor.prod.mls.internal
+      annotations:
+        alb.ingress.kubernetes.io/scheme: internal
+        alb.ingress.kubernetes.io/target-type: ip
+        alb.ingress.kubernetes.io/group.name: mls-prod
+        alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+        alb.ingress.kubernetes.io/certificate-arn: REPLACE_WITH_CERTIFICATE_ARN
+        alb.ingress.kubernetes.io/healthcheck-path: /api/v2.0/ping
+        alb.ingress.kubernetes.io/load-balancer-attributes: routing.http.drop_invalid_header_fields.enabled=true
+  persistence:
+    imageChartStorage:
+      s3:
+        bucket: mls-s3-prod-store-001
+        keyid: REPLACE_WITH_S3_KEY_ARN
+  database:
+    external:
+      host: REPLACE_WITH_RDS_ADDRESS

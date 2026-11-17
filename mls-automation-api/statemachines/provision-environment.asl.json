@@ -1,0 +1,242 @@
+{
+  "Comment": "Provision one environment: validate the request, launch one EC2 instance from the hardened image with the mandatory tags, wait until it expires (re-reading the expiry so an extension is honoured), then terminate it. Names in dollar-brace placeholders are filled in by the Terraform module step-functions (templatefile) before deployment.",
+  "QueryLanguage": "JSONata",
+  "StartAt": "Validate",
+  "TimeoutSeconds": 266400,
+  "States": {
+    "Validate": {
+      "Type": "Choice",
+      "Comment": "No tag, no launch: every rule that rejects a request is checked before anything is created.",
+      "Choices": [
+        {
+          "Condition": "{% $not($type($states.input.environmentId) = 'string' and $type($states.input.configuration) = 'string' and $type($states.input.owner) = 'string' and $type($states.input.ticket) = 'string') %}",
+          "Next": "RejectMissingField"
+        },
+        {
+          "Condition": "{% $count($match($states.input.environmentId, /^env-[a-z0-9-]{3,60}$/)) = 0 or $count($match($states.input.owner, /^[a-z0-9][a-z0-9-]{1,39}$/)) = 0 or $count($match($states.input.ticket, /^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/)) = 0 %}",
+          "Next": "RejectBadFormat"
+        },
+        {
+          "Condition": "{% $exists($states.input.ttlHours) and ($type($states.input.ttlHours) != 'number' or $states.input.ttlHours < 1 or $states.input.ttlHours > ${max_ttl_hours} or $states.input.ttlHours != $floor($states.input.ttlHours)) %}",
+          "Next": "RejectTtl"
+        },
+        {
+          "Condition": "{% $not($exists($lookup(${configurations_json}, $states.input.configuration))) %}",
+          "Next": "RejectUnknownConfiguration"
+        }
+      ],
+      "Default": "Prepare"
+    },
+    "RejectMissingField": {
+      "Type": "Fail",
+      "Error": "InvalidRequest",
+      "Cause": "environmentId, configuration, owner and ticket are required text values."
+    },
+    "RejectBadFormat": {
+      "Type": "Fail",
+      "Error": "InvalidRequest",
+      "Cause": "environmentId must look like env-abc123, owner must be a team or role (lower case, digits, hyphens) and ticket letters, digits, hyphens or underscores."
+    },
+    "RejectTtl": {
+      "Type": "Fail",
+      "Error": "InvalidRequest",
+      "Cause": "ttlHours must be a whole number from 1 to ${max_ttl_hours}. A longer life needs a new ticket."
+    },
+    "RejectUnknownConfiguration": {
+      "Type": "Fail",
+      "Error": "UnknownConfiguration",
+      "Cause": "The configuration is not in the catalogue."
+    },
+    "Prepare": {
+      "Type": "Pass",
+      "Assign": {
+        "req": "{% $states.input %}",
+        "cfg": "{% $lookup(${configurations_json}, $states.input.configuration) %}",
+        "ttl": "{% $exists($states.input.ttlHours) ? $states.input.ttlHours : ${default_ttl_hours} %}"
+      },
+      "Next": "Stamp"
+    },
+    "Stamp": {
+      "Type": "Pass",
+      "Assign": {
+        "startedAt": "{% $fromMillis($toMillis($now()), '[Y0001]-[M01]-[D01]T[H01]:[m01]:[s01]Z') %}",
+        "expiresAt": "{% $fromMillis($toMillis($now()) + $ttl * 3600000, '[Y0001]-[M01]-[D01]T[H01]:[m01]:[s01]Z') %}"
+      },
+      "Next": "BuildTags"
+    },
+    "BuildTags": {
+      "Type": "Pass",
+      "Assign": {
+        "tags": "{% [{'Key': 'Name', 'Value': $req.environmentId}, {'Key': 'env-id', 'Value': $req.environmentId}, {'Key': 'project', 'Value': 'mls'}, {'Key': 'environment', 'Value': '${environment}'}, {'Key': 'function', 'Value': 'lab'}, {'Key': 'owner', 'Value': $req.owner}, {'Key': 'ticket', 'Value': $req.ticket}, {'Key': 'configuration', 'Value': $req.configuration}, {'Key': 'ttl', 'Value': $string($ttl) & 'h'}, {'Key': 'expires-at', 'Value': $expiresAt}, {'Key': 'requested-at', 'Value': $startedAt}, {'Key': 'managed-by', 'Value': 'provisioning'}, {'Key': 'data-class', 'Value': 'none'}, {'Key': 'execution', 'Value': $states.context.Execution.Name}] %}"
+      },
+      "Next": "LaunchInstance"
+    },
+    "LaunchInstance": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:ec2:runInstances",
+      "Comment": "Direct SDK call, no Lambda. The ClientToken is the environment id, so a retry never creates a second instance. No public address, IMDSv2 only, encrypted root volume, no key pair (Session Manager is the way in).",
+      "Arguments": {
+        "ClientToken": "{% $req.environmentId %}",
+        "ImageId": "{% $cfg.amiId %}",
+        "InstanceType": "{% $cfg.instanceType %}",
+        "MinCount": 1,
+        "MaxCount": 1,
+        "InstanceInitiatedShutdownBehavior": "stop",
+        "IamInstanceProfile": {
+          "Name": "${instance_profile_name}"
+        },
+        "NetworkInterfaces": [
+          {
+            "DeviceIndex": 0,
+            "SubnetId": "{% ($subnets := ${subnet_ids_json}; $subnets[$floor($random() * $count($subnets))]) %}",
+            "Groups": [
+              "${security_group_id}"
+            ],
+            "AssociatePublicIpAddress": "{% ${associate_public_ip} %}",
+            "DeleteOnTermination": true
+          }
+        ],
+        "MetadataOptions": {
+          "HttpTokens": "required",
+          "HttpEndpoint": "enabled",
+          "HttpPutResponseHopLimit": 1,
+          "InstanceMetadataTags": "disabled"
+        },
+        "CreditSpecification": {
+          "CpuCredits": "standard"
+        },
+        "BlockDeviceMappings": [
+          {
+            "DeviceName": "/dev/sda1",
+            "Ebs": {
+              "VolumeSize": "{% $cfg.rootVolumeGb %}",
+              "VolumeType": "gp3",
+              "Encrypted": true,
+              "DeleteOnTermination": true
+            }
+          }
+        ],
+        "UserData": "{% $base64encode($cfg.userData) %}",
+        "TagSpecifications": "{% ['instance', 'volume', 'network-interface'] ~> $map(function($t) {{'ResourceType': $t, 'Tags': $tags}}) %}"
+      },
+      "TimeoutSeconds": 120,
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Ec2.Ec2Exception",
+            "States.Timeout"
+          ],
+          "IntervalSeconds": 10,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "LaunchFailed"
+        }
+      ],
+      "Assign": {
+        "instanceId": "{% $states.result.Instances[0].InstanceId %}"
+      },
+      "Next": "WaitUntilExpiry"
+    },
+    "LaunchFailed": {
+      "Type": "Fail",
+      "Error": "LaunchFailed",
+      "Cause": "The instance could not be launched. See the execution history for the service's answer."
+    },
+    "WaitUntilExpiry": {
+      "Type": "Wait",
+      "Timestamp": "{% $expiresAt %}",
+      "Next": "ReadExpiry"
+    },
+    "ReadExpiry": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:ec2:describeInstances",
+      "Comment": "The tag is the truth: an extension changes the expires-at tag, and the wait starts again until that time.",
+      "Arguments": {
+        "InstanceIds": [
+          "{% $instanceId %}"
+        ]
+      },
+      "TimeoutSeconds": 60,
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Ec2.Ec2Exception",
+            "States.Timeout"
+          ],
+          "IntervalSeconds": 5,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "InstanceGone"
+        }
+      ],
+      "Assign": {
+        "instanceState": "{% $states.result.Reservations[0].Instances[0].State.Name %}",
+        "expiresAt": "{% $exists($states.result.Reservations[0].Instances[0].Tags[Key = 'expires-at'].Value) ? $states.result.Reservations[0].Instances[0].Tags[Key = 'expires-at'].Value : $expiresAt %}"
+      },
+      "Next": "Expired"
+    },
+    "Expired": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Condition": "{% $instanceState = 'terminated' or $instanceState = 'shutting-down' %}",
+          "Next": "Done"
+        },
+        {
+          "Condition": "{% $toMillis($expiresAt) > $toMillis($now()) %}",
+          "Next": "WaitUntilExpiry"
+        }
+      ],
+      "Default": "TerminateInstance"
+    },
+    "TerminateInstance": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:ec2:terminateInstances",
+      "Arguments": {
+        "InstanceIds": [
+          "{% $instanceId %}"
+        ]
+      },
+      "TimeoutSeconds": 60,
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Ec2.Ec2Exception",
+            "States.Timeout"
+          ],
+          "IntervalSeconds": 10,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Next": "Done"
+    },
+    "InstanceGone": {
+      "Type": "Fail",
+      "Error": "InstanceNotReadable",
+      "Cause": "The instance could not be read at its expiry time. The ttl-reaper removes it if it still exists and is past its expiry."
+    },
+    "Done": {
+      "Type": "Succeed",
+      "Output": {
+        "environmentId": "{% $req.environmentId %}",
+        "instanceId": "{% $instanceId %}",
+        "expiresAt": "{% $expiresAt %}"
+      }
+    }
+  }
+}

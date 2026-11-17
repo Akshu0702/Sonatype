@@ -1,0 +1,79 @@
+# ci-mls-automation-api: checks for the mls-automation-api repository.
+# Pull requests are validated by the branch build-validation policy on main and develop.
+trigger:
+  branches:
+    include:
+      - develop
+      - release/*
+  paths:
+    exclude:
+      - '*.md'
+
+parameters:
+  # The self-hosted build agent in Mumbai. Set to an empty string to use Microsoft-hosted agents.
+  - name: agentPool
+    type: string
+    default: mls-agents
+
+variables:
+  - name: securityEnforce
+    value: 'false'
+
+stages:
+  - stage: Checks
+    displayName: Checks
+    jobs:
+      - job: spec
+        displayName: OpenAPI contract
+        pool:
+          ${{ if eq(parameters.agentPool, '') }}:
+            vmImage: ubuntu-24.04
+          ${{ if ne(parameters.agentPool, '') }}:
+            name: ${{ parameters.agentPool }}
+        steps:
+          - checkout: self
+          - script: bash scripts/ci/spec-lint.sh
+            displayName: Lint OpenAPI files
+          - script: docker run --rm -v "$(Build.SourcesDirectory):/w" -v "$(Build.ArtifactStagingDirectory):/a" alpine:3.20 chown -R "`id -u`:`id -g`" /w /a
+            displayName: Hand the workspace back to the agent user
+            condition: always()
+      - job: statemachines
+        displayName: State machine definitions
+        pool:
+          ${{ if eq(parameters.agentPool, '') }}:
+            vmImage: ubuntu-24.04
+          ${{ if ne(parameters.agentPool, '') }}:
+            name: ${{ parameters.agentPool }}
+        steps:
+          - checkout: self
+          - script: bash scripts/ci/statemachine-check.sh
+            displayName: Check state machine JSON
+          - script: bash scripts/ci/statemachine-test.sh
+            displayName: Run the state machines in the local emulator
+          - script: docker run --rm -v "$(Build.SourcesDirectory):/w" -v "$(Build.ArtifactStagingDirectory):/a" alpine:3.20 chown -R "`id -u`:`id -g`" /w /a
+            displayName: Hand the workspace back to the agent user
+            condition: always()
+      - job: security
+        displayName: Security scans
+        pool:
+          ${{ if eq(parameters.agentPool, '') }}:
+            vmImage: ubuntu-24.04
+          ${{ if ne(parameters.agentPool, '') }}:
+            name: ${{ parameters.agentPool }}
+        steps:
+          - checkout: self
+          - script: bash scripts/ci/scan.sh
+            displayName: Security scan (secrets and dependencies)
+            env:
+              SECURITY_ENFORCE: ${{ variables.securityEnforce }}
+              SCAN_OUT: $(Build.ArtifactStagingDirectory)/scan-results
+            continueOnError: true
+          - task: PublishPipelineArtifact@1
+            displayName: Publish scan results
+            condition: always()
+            inputs:
+              targetPath: $(Build.ArtifactStagingDirectory)/scan-results
+              artifact: scan-results
+          - script: docker run --rm -v "$(Build.SourcesDirectory):/w" -v "$(Build.ArtifactStagingDirectory):/a" alpine:3.20 chown -R "`id -u`:`id -g`" /w /a
+            displayName: Hand the workspace back to the agent user
+            condition: always()

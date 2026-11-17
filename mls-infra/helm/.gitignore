@@ -1,0 +1,6 @@
+# Dependencies are rebuilt from Chart.lock; the packaged charts are not committed.
+charts/*/charts/
+charts/*/*.tgz
+# Platform chart dependencies are also rebuilt from Chart.lock
+platform/charts/*/charts/
+platform/charts/*/*.tgz

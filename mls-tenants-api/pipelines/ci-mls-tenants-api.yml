@@ -1,0 +1,69 @@
+# ci-mls-tenants-api: build and test for the mls-tenants-api repository.
+# Pull requests are validated by the branch build-validation policy on main and develop.
+# The service depends on the shared library (com.platform:platform-security-commons), which is not in a package feed yet,
+# so the pipeline checks out mls-commons-lib (develop) beside this repository and builds it into the Maven cache first.
+trigger:
+  branches:
+    include:
+      - develop
+      - release/*
+  paths:
+    exclude:
+      - '*.md'
+      - docs/*
+
+parameters:
+  # The self-hosted build agent in Mumbai. Set to an empty string to use Microsoft-hosted agents.
+  - name: agentPool
+    type: string
+    default: mls-agents
+
+resources:
+  repositories:
+    - repository: infra
+      type: git
+      name: mls-infra
+    - repository: commons
+      type: git
+      name: mls-commons-lib
+      ref: refs/heads/develop
+
+stages:
+  - stage: Checks
+    displayName: Checks
+    jobs:
+      - job: build
+        displayName: Build and test (Maven, JDK 21, PostgreSQL 16)
+        pool:
+          ${{ if eq(parameters.agentPool, '') }}:
+            vmImage: ubuntu-24.04
+          ${{ if ne(parameters.agentPool, '') }}:
+            name: ${{ parameters.agentPool }}
+        steps:
+          - checkout: self
+          - checkout: commons
+          - script: bash mls-tenants-api/scripts/test.sh
+            displayName: Build the library, then build and test the service
+            env:
+              COMMONS_DIR: $(Pipeline.Workspace)/s/mls-commons-lib
+              REPO_DIR: $(Pipeline.Workspace)/s/mls-tenants-api
+          - template: pipelines/templates/maven-version.yml@infra
+            parameters:
+              dir: $(Pipeline.Workspace)/s/mls-tenants-api
+          - template: pipelines/templates/maven-publish.yml@infra
+            parameters:
+              dir: $(Pipeline.Workspace)/s/mls-tenants-api
+              commonsDir: $(Pipeline.Workspace)/s/mls-commons-lib
+          - task: PublishTestResults@2
+            displayName: Publish test results
+            condition: succeededOrFailed()
+            inputs:
+              testResultsFormat: JUnit
+              testResultsFiles: 'mls-tenants-api/**/surefire-reports/TEST-*.xml'
+              searchFolder: $(Pipeline.Workspace)/s
+              mergeTestResults: true
+              testRunTitle: ci-mls-tenants-api
+          # The containers run as root and leave root-owned files (target/) in the checkouts; hand them back to the agent user.
+          - script: docker run --rm -v "$(Pipeline.Workspace)/s:/w" alpine:3.20 chown -R "`id -u`:`id -g`" /w
+            displayName: Hand the workspace back to the agent user
+            condition: always()

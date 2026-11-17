@@ -1,0 +1,22 @@
+aws-load-balancer-controller:
+  replicaCount: 2
+  region: ap-south-1
+  serviceAccount:
+    create: true
+    name: aws-load-balancer-controller
+  nodeSelector:
+    workload: system
+  podDisruptionBudget:
+    maxUnavailable: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+  enableShield: false
+  enableWaf: false
+  enableWafv2: false
+  defaultTags:
+    project: mls
+    managed-by: argocd

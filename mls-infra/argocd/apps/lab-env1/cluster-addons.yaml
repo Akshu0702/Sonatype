@@ -1,0 +1,45 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: cluster-addons
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - list:
+        elements:
+          - app: aws-load-balancer-controller
+            namespace: kube-system
+          - app: cluster-autoscaler
+            namespace: kube-system
+          - app: metrics-server
+            namespace: kube-system
+          - app: fluent-bit
+            namespace: logging
+          - app: external-secrets
+            namespace: external-secrets
+  template:
+    metadata:
+      name: "{{ .app }}"
+      labels:
+        env: lab-env1
+    spec:
+      project: lab-addons
+      source:
+        repoURL: https://dev.azure.com/ML-AIML-COE/Sonatype-MLS/_git/mls-infra
+        targetRevision: develop
+        path: "helm/charts/{{ .app }}"
+        helm:
+          ignoreMissingValueFiles: true
+          valueFiles:
+            - "../../values/base/{{ .app }}.yaml"
+            - "../../values/lab-env1/{{ .app }}.yaml"
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{ .namespace }}"
+      # No automated sync: a change reaches the cluster only when the workflow requests the sync after approval.
+      syncPolicy:
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true

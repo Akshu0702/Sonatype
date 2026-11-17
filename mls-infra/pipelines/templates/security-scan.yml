@@ -1,0 +1,22 @@
+# Secrets and misconfiguration scans. Report mode until securityEnforce is true.
+parameters:
+  - name: enforce
+    type: string
+    default: 'false'
+
+steps:
+  - script: bash scripts/ci/security-scan.sh
+    displayName: Security scan (secrets and Terraform misconfiguration)
+    env:
+      SECURITY_ENFORCE: ${{ parameters.enforce }}
+      SCAN_OUT: $(Build.ArtifactStagingDirectory)/scan-results
+    continueOnError: true
+  - task: PublishPipelineArtifact@1
+    displayName: Publish scan results
+    condition: always()
+    inputs:
+      targetPath: $(Build.ArtifactStagingDirectory)/scan-results
+      artifact: scan-results
+  - script: bash scripts/ci/fix-workspace-ownership.sh "$(Build.SourcesDirectory)" "$(Build.ArtifactStagingDirectory)"
+    displayName: Hand the workspace back to the agent user
+    condition: always()

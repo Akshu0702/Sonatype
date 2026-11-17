@@ -1,0 +1,10 @@
+---
+- name: Apply the hardening baseline
+  hosts: all
+  become: true
+  gather_facts: true
+  roles:
+    - role: baseline_hardening
+    - role: auditd
+    - role: ssm_agent
+      when: ssm_agent_enabled | default(true) | bool

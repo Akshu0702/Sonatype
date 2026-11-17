@@ -1,0 +1,14 @@
+---
+# Container test: the same roles as the real playbook, with the parts a container cannot run turned off.
+- name: Converge the baseline in a container
+  hosts: all
+  become: false
+  gather_facts: true
+  vars:
+    baseline_hardening_manage_services: false
+    baseline_hardening_apply_sysctl: false
+    baseline_hardening_validate_sshd: false
+    auditd_manage_services: false
+  roles:
+    - role: baseline_hardening
+    - role: auditd

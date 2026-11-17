@@ -1,0 +1,38 @@
+---
+- name: Install the automatic update packages
+  ansible.builtin.package:
+    name: "{{ baseline_hardening_update_packages }}"
+    state: present
+
+- name: Turn on automatic security updates (Debian family)
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+    owner: root
+    group: root
+    mode: "0644"
+  when: ansible_facts['os_family'] == 'Debian'
+
+- name: Apply security updates automatically (Red Hat family)
+  ansible.builtin.lineinfile:
+    path: /etc/dnf/automatic.conf
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - { regexp: '^upgrade_type\s*=', line: upgrade_type = security }
+    - { regexp: '^apply_updates\s*=', line: apply_updates = yes }
+  when: ansible_facts['os_family'] == 'RedHat'
+
+- name: Make sure the automatic update timer runs (Red Hat family)
+  ansible.builtin.service:
+    name: dnf-automatic.timer
+    state: started
+    enabled: true
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - baseline_hardening_manage_services | bool

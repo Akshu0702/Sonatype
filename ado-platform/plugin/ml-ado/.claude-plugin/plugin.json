@@ -1,0 +1,9 @@
+{
+  "name": "ml-ado",
+  "description": "Set up, work in and audit an Azure DevOps project the same way every time (AzureDevOps-Platform-v1): a setup agent that stops at every approval, a read-only auditor, skills for work items, pull requests, releases, wiki and the audit, and hooks that block a token in a file and dryRun=false without the user's go-ahead. Needs the adoctl command line.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Motivity Labs"
+  },
+  "license": "MIT"
+}

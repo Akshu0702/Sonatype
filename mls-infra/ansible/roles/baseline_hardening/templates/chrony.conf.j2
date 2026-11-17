@@ -1,0 +1,7 @@
+# Managed by Ansible (baseline_hardening). Do not edit by hand.
+{% for server in baseline_hardening_ntp_servers %}
+server {{ server }} prefer iburst minpoll 4 maxpoll 4
+{% endfor %}
+driftfile /var/lib/chrony/drift
+makestep 1.0 3
+rtcsync

@@ -1,0 +1,63 @@
+# ci-mls-portal-ui-react: checks for the mls-portal-ui-react repository.
+# Pull requests are validated by the branch build-validation policy on main and develop.
+trigger:
+  branches:
+    include:
+      - develop
+      - release/*
+  paths:
+    exclude:
+      - '*.md'
+
+parameters:
+  # The self-hosted build agent in Mumbai. Set to an empty string to use Microsoft-hosted agents.
+  - name: agentPool
+    type: string
+    default: mls-agents
+
+variables:
+  - name: securityEnforce
+    value: 'false'
+
+stages:
+  - stage: Checks
+    displayName: Checks
+    jobs:
+      - job: security
+        displayName: Security scans
+        pool:
+          ${{ if eq(parameters.agentPool, '') }}:
+            vmImage: ubuntu-24.04
+          ${{ if ne(parameters.agentPool, '') }}:
+            name: ${{ parameters.agentPool }}
+        steps:
+          - checkout: self
+          - script: bash scripts/ci/scan.sh
+            displayName: Security scan (secrets and dependencies)
+            env:
+              SECURITY_ENFORCE: ${{ variables.securityEnforce }}
+              SCAN_OUT: $(Build.ArtifactStagingDirectory)/scan-results
+            continueOnError: true
+          - task: PublishPipelineArtifact@1
+            displayName: Publish scan results
+            condition: always()
+            inputs:
+              targetPath: $(Build.ArtifactStagingDirectory)/scan-results
+              artifact: scan-results
+          - script: docker run --rm -v "$(Build.SourcesDirectory):/w" -v "$(Build.ArtifactStagingDirectory):/a" alpine:3.20 chown -R "`id -u`:`id -g`" /w /a
+            displayName: Hand the workspace back to the agent user
+            condition: always()
+      - job: build
+        displayName: Test and build (Node 22)
+        pool:
+          ${{ if eq(parameters.agentPool, '') }}:
+            vmImage: ubuntu-24.04
+          ${{ if ne(parameters.agentPool, '') }}:
+            name: ${{ parameters.agentPool }}
+        steps:
+          - checkout: self
+          - script: docker run --rm -v "$(Build.SourcesDirectory):/w" -w /w node:22 sh -c "npm ci --no-audit --no-fund && npm test && npm run build"
+            displayName: Install, test and build
+          - script: docker run --rm -v "$(Build.SourcesDirectory):/w" alpine:3.20 chown -R "`id -u`:`id -g`" /w
+            displayName: Hand the workspace back to the agent user
+            condition: always()

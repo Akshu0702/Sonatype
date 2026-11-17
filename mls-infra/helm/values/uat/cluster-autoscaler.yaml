@@ -1,0 +1,8 @@
+# uat: no cluster exists yet.
+cluster-autoscaler:
+  autoDiscovery:
+    clusterName: mls-eks-uat-api-001
+  rbac:
+    serviceAccount:
+      annotations:
+        eks.amazonaws.com/role-arn: arn:aws:iam::096631344162:role/mls-role-uat-api-cluster-autoscaler

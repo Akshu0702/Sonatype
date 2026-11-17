@@ -1,0 +1,40 @@
+# The platform services of prod. One application per service, from the generic chart and the service's own values.
+# Prod syncs only when approved.
+# For the prod cluster's OWN Argo CD only; not applied anywhere.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: platform-services
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - list:
+        elements:
+          - { app: tenants-service }
+          - { app: itsm-api }
+          - { app: portal-api }
+          - { app: console-ui }
+  template:
+    metadata:
+      name: "{{ .app }}"
+      labels:
+        env: prod
+    spec:
+      project: platform-prod
+      source:
+        repoURL: https://dev.azure.com/ML-AIML-COE/Sonatype-MLS/_git/mls-infra
+        targetRevision: develop
+        path: helm/platform/charts/mls-service
+        helm:
+          valueFiles:
+            - "../../values/prod/{{ .app }}.yaml"
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: platform
+      # Prod: no automated sync. A change reaches the cluster only when someone approves and requests the sync.
+      syncPolicy:
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true

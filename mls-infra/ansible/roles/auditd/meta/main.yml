@@ -1,0 +1,12 @@
+---
+galaxy_info:
+  author: Motivity Labs
+  description: Linux audit daemon and rules for the Sonatype Managed Lab
+  license: proprietary
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Ubuntu
+      versions: [jammy, noble]
+    - name: Amazon
+      versions: [all]
+dependencies: []

@@ -1,0 +1,11 @@
+# Rebuilds each wrapper chart from its lock file, lints it and renders it for every environment.
+steps:
+  - script: bash scripts/ci/run-if-present.sh "helm checks" scripts/ci/helm-checks.sh
+    displayName: Helm lint and template
+  - script: bash scripts/ci/run-if-present.sh "platform helm checks" scripts/ci/helm-platform-checks.sh
+    displayName: Platform charts, Argo CD environments and render rules
+  - script: python3 scripts/ci/test_check_platform_render.py
+    displayName: Tests of the render rules
+  - script: bash scripts/ci/fix-workspace-ownership.sh "$(Build.SourcesDirectory)" "$(Build.ArtifactStagingDirectory)"
+    displayName: Hand the workspace back to the agent user
+    condition: always()

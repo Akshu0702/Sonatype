@@ -1,0 +1,10 @@
+{
+  "name": "mls-statemachine-tests",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Local emulator for the JSONata subset of Amazon States Language used by statemachines/*.asl.json",
+  "type": "module",
+  "dependencies": {
+    "jsonata": "2.0.6"
+  }
+}

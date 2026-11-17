@@ -1,0 +1,7 @@
+# Formats, validates and tests the Terraform modules.
+steps:
+  - script: bash scripts/ci/terraform-checks.sh
+    displayName: Terraform fmt, validate and test
+  - script: bash scripts/ci/fix-workspace-ownership.sh "$(Build.SourcesDirectory)" "$(Build.ArtifactStagingDirectory)"
+    displayName: Hand the workspace back to the agent user
+    condition: always()

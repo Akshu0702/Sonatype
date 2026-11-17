@@ -1,0 +1,13 @@
+ADR-0001-Custom-Portal-Only
+ADR-0002-Immutable-Plugin-Bundle
+ADR-0003-Hardened-Linux-And-PostgreSQL-Environments
+ADR-0004-Step-Functions-For-The-Lifecycle
+ADR-0005-CIS-Benchmarks-As-The-Hardening-Baseline
+ADR-0006-Well-Architected-Framework-For-Design-Review
+ADR-0007-GitOps-With-Argo-CD
+ADR-0008-Spec-First-OpenAPI-For-The-Portal-API
+ADR-0009-Step-Functions-As-Code-With-Versions-And-Aliases
+ADR-0010-Feature-Flags-With-Administrator-Controlled-Role-Assignment
+ADR-0011-Scopes-From-The-Database-Users-Groups-Roles-Scopes
+ADR-0012-No-Kafka-Or-Redis-For-Now
+ADR-0013-Multi-Tenant-Platform-With-Products

@@ -1,0 +1,106 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DenyEveryRegionExceptMumbai",
+      "Effect": "Deny",
+      "NotAction": [
+        "iam:*",
+        "route53:*",
+        "sts:*",
+        "s3:*",
+        "budgets:*",
+        "support:*",
+        "organizations:Describe*",
+        "organizations:List*"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringNotEquals": {
+          "aws:RequestedRegion": "ap-south-1"
+        }
+      }
+    },
+    {
+      "Sid": "ProtectTheDefaultVpcAndItsParts",
+      "Effect": "Deny",
+      "Action": [
+        "ec2:Delete*",
+        "ec2:Modify*",
+        "ec2:Replace*",
+        "ec2:Associate*",
+        "ec2:Disassociate*",
+        "ec2:Attach*",
+        "ec2:Detach*",
+        "ec2:Authorize*",
+        "ec2:Revoke*",
+        "ec2:Create*Route*",
+        "ec2:Create*Entry",
+        "ec2:Terminate*",
+        "ec2:RunInstances"
+      ],
+      "Resource": [
+        "arn:aws:ec2:ap-south-1:096631344162:vpc/vpc-063b52caac6f0cb46",
+        "arn:aws:ec2:ap-south-1:096631344162:subnet/subnet-036aeecf1b5f7ad01",
+        "arn:aws:ec2:ap-south-1:096631344162:subnet/subnet-0810c56a61c6e0183",
+        "arn:aws:ec2:ap-south-1:096631344162:subnet/subnet-05681a89382c28794",
+        "arn:aws:ec2:ap-south-1:096631344162:security-group/sg-0a91b3ee34568fcc6",
+        "arn:aws:ec2:ap-south-1:096631344162:internet-gateway/igw-042c2a28898171c6b",
+        "arn:aws:ec2:ap-south-1:096631344162:route-table/rtb-055aead8fc6b4195f",
+        "arn:aws:ec2:ap-south-1:096631344162:network-acl/acl-07938469ca0697fa3"
+      ]
+    },
+    {
+      "Sid": "DenyChangesToResourcesTaggedForOthers",
+      "Effect": "Deny",
+      "Action": [
+        "ec2:Delete*",
+        "ec2:Modify*",
+        "ec2:Terminate*",
+        "ec2:Stop*",
+        "rds:Delete*",
+        "rds:Modify*",
+        "eks:Delete*",
+        "eks:Update*",
+        "kms:ScheduleKeyDeletion",
+        "kms:Disable*",
+        "kms:PutKeyPolicy"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "Null": {
+          "aws:ResourceTag/Project": "false"
+        },
+        "StringNotEquals": {
+          "aws:ResourceTag/Project": "mls"
+        }
+      }
+    },
+    {
+      "Sid": "DenyCredentialAndPrincipalCreation",
+      "Effect": "Deny",
+      "Action": [
+        "iam:CreateUser",
+        "iam:CreateAccessKey",
+        "iam:CreateLoginProfile",
+        "iam:UpdateLoginProfile",
+        "iam:AttachUserPolicy",
+        "iam:PutUserPolicy",
+        "iam:AttachGroupPolicy",
+        "iam:PutGroupPolicy",
+        "iam:CreateGroup",
+        "iam:AddUserToGroup",
+        "iam:UpdateAccessKey",
+        "iam:DeleteAccessKey",
+        "iam:DeleteUser",
+        "iam:SetDefaultPolicyVersion",
+        "iam:CreateSAMLProvider",
+        "iam:UpdateSAMLProvider",
+        "iam:DeleteSAMLProvider",
+        "iam:PutRolePermissionsBoundary",
+        "iam:DeleteRolePermissionsBoundary"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

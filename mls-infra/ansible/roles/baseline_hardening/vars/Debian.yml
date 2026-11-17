@@ -1,0 +1,15 @@
+---
+baseline_hardening_sshd_service: ssh
+baseline_hardening_chrony_service: chrony
+baseline_hardening_chrony_conf: /etc/chrony/chrony.conf
+baseline_hardening_packages_present:
+  - chrony
+baseline_hardening_packages_absent:
+  - telnet
+  - rsh-client
+  - talk
+  - nis
+  - tftp
+  - xinetd
+baseline_hardening_update_packages:
+  - unattended-upgrades

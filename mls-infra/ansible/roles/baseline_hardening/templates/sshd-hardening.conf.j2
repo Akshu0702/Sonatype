@@ -1,0 +1,24 @@
+# Managed by Ansible (baseline_hardening). Do not edit by hand.
+PermitRootLogin no
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitEmptyPasswords no
+HostbasedAuthentication no
+IgnoreRhosts yes
+PermitUserEnvironment no
+X11Forwarding no
+AllowAgentForwarding no
+AllowTcpForwarding no
+UsePAM yes
+LogLevel VERBOSE
+MaxAuthTries {{ baseline_hardening_ssh_max_auth_tries }}
+LoginGraceTime {{ baseline_hardening_ssh_login_grace_time }}
+ClientAliveInterval {{ baseline_hardening_ssh_client_alive_interval }}
+ClientAliveCountMax {{ baseline_hardening_ssh_client_alive_count_max }}
+Banner /etc/issue.net
+Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr
+MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com
+KexAlgorithms curve25519-sha256,curve25519-sha256@libssh.org,diffie-hellman-group16-sha512,diffie-hellman-group14-sha256
+{% if baseline_hardening_ssh_allow_groups | length > 0 %}
+AllowGroups {{ baseline_hardening_ssh_allow_groups | join(' ') }}
+{% endif %}

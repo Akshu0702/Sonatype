@@ -1,0 +1,20 @@
+---
+- name: Make sure the journal directory exists
+  ansible.builtin.file:
+    path: /var/log/journal
+    state: directory
+    owner: root
+    group: root
+    mode: "2755"
+
+- name: Keep the journal across reboots
+  ansible.builtin.copy:
+    content: |
+      [Journal]
+      Storage=persistent
+      Compress=yes
+    dest: /etc/systemd/journald.conf.d/60-mls.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart journald

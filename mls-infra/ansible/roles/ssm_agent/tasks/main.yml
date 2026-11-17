@@ -1,0 +1,23 @@
+---
+- name: Collect the services on this host
+  ansible.builtin.service_facts:
+
+- name: Find the Systems Manager agent service
+  ansible.builtin.set_fact:
+    ssm_agent_units: "{{ ansible_facts['services'].keys() | select('search', 'amazon-ssm-agent') | list }}"
+
+- name: Fail if the Systems Manager agent is missing
+  ansible.builtin.assert:
+    that:
+      - ssm_agent_units | length > 0
+    fail_msg: >-
+      No amazon-ssm-agent service was found. Hosts are reached through Systems Manager, so the image
+      must include the agent. Check the AMI.
+  when: ssm_agent_require_present | bool
+
+- name: Make sure the agent runs and starts at boot
+  ansible.builtin.service:
+    name: "{{ ssm_agent_units | first | regex_replace('\\.service$', '') }}"
+    state: started
+    enabled: true
+  when: ssm_agent_units | length > 0

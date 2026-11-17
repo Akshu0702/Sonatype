@@ -1,0 +1,21 @@
+fluent-bit:
+  tolerations:
+    - operator: Exists
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 128Mi
+  # Logs go to the log platform (Logstash), which masks credentials and tokens before indexing.
+  config:
+    outputs: |
+      [OUTPUT]
+          Name          tcp
+          Match         kube.*
+          Host          REPLACE_WITH_LOGSTASH_HOST
+          Port          5050
+          Format        json_lines
+          tls           On
+          tls.verify    On
+          Retry_Limit   5

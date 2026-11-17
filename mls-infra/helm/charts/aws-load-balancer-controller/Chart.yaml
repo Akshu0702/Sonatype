@@ -1,0 +1,10 @@
+apiVersion: v2
+name: aws-load-balancer-controller
+description: Wrapper chart for AWS Load Balancer Controller with a pinned upstream dependency
+type: application
+version: 0.1.0
+appVersion: "v3.6.2"
+dependencies:
+  - name: aws-load-balancer-controller
+    version: "3.6.2"
+    repository: https://aws.github.io/eks-charts

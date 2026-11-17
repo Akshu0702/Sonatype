@@ -1,0 +1,10 @@
+---
+- name: Make sure the required packages are installed
+  ansible.builtin.package:
+    name: "{{ baseline_hardening_packages_present }}"
+    state: present
+
+- name: Remove insecure legacy client and server packages
+  ansible.builtin.package:
+    name: "{{ baseline_hardening_packages_absent }}"
+    state: absent

@@ -1,0 +1,6 @@
+aws-load-balancer-controller:
+  clusterName: mls-eks-prod-lab-001
+  vpcId: REPLACE_WITH_VPC_ID
+  serviceAccount:
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::<account-id>:role/mls-role-prod-lab1-load-balancer-controller

@@ -1,0 +1,18 @@
+# For the uat cluster's OWN Argo CD only. Not applied anywhere: no uat cluster exists, and the lab Argo CD must never load this file.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform-uat
+  namespace: argocd
+spec:
+  description: Platform services of uat, deployed from mls-infra
+  sourceRepos:
+    - https://dev.azure.com/ML-AIML-COE/Sonatype-MLS/_git/mls-infra
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: "*"
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"
+  orphanedResources:
+    warn: true

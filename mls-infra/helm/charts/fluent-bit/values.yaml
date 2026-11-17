@@ -1,0 +1,3 @@
+# Intentionally empty. Settings live in helm/values/base/fluent-bit.yaml and helm/values/<env>/fluent-bit.yaml,
+# nested under the upstream chart's name (fluent-bit:).
+{}

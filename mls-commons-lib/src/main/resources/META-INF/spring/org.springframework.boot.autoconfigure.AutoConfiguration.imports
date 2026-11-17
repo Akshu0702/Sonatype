@@ -1,0 +1,4 @@
+com.platform.security.autoconfigure.RlsTenancyAutoConfiguration
+com.platform.security.autoconfigure.RemoteIssuerRegistryAutoConfiguration
+com.platform.security.autoconfigure.RemotePermissionAutoConfiguration
+com.platform.security.autoconfigure.TenantFeaturesAutoConfiguration

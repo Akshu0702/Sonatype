@@ -1,0 +1,14 @@
+{
+  "//": "Hooks that ship with ml-ado. Both can block (exit 2). token-guard stops a token being written into a file or a commit; dryrun-guard stops dryRun being set to false unless the user typed the go-ahead.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|Bash",
+        "hooks": [
+          { "type": "command", "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/token-guard.sh" },
+          { "type": "command", "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/dryrun-guard.sh" }
+        ]
+      }
+    ]
+  }
+}

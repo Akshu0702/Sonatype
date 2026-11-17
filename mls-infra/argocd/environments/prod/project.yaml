@@ -1,0 +1,18 @@
+# For the prod cluster's OWN Argo CD only. Not applied anywhere: no prod cluster exists, and the lab Argo CD must never load this file.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform-prod
+  namespace: argocd
+spec:
+  description: Platform services of prod, deployed from mls-infra
+  sourceRepos:
+    - https://dev.azure.com/ML-AIML-COE/Sonatype-MLS/_git/mls-infra
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: "*"
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"
+  orphanedResources:
+    warn: true

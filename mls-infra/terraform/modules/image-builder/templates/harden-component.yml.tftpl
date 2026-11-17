@@ -1,0 +1,47 @@
+name: mls-harden-ubuntu
+description: Applies the hardening baseline of the mls-infra repository (ansible/playbooks/harden.yml) to the image.
+schemaVersion: 1.0
+phases:
+  - name: build
+    steps:
+      - name: DownloadPlaybooks
+        action: S3Download
+        inputs:
+          - source: s3://${bucket}/${archive_key}
+            destination: /tmp/mls-ansible.tar.gz
+            expectedBucketOwner: "${account_id}"
+      - name: ApplyBaseline
+        action: ExecuteBash
+        inputs:
+          commands:
+            - set -euo pipefail
+            - export DEBIAN_FRONTEND=noninteractive
+            - apt-get update -y
+            - apt-get install -y --no-install-recommends ansible-core
+            - mkdir -p /tmp/mls-ansible
+            - tar -xzf /tmp/mls-ansible.tar.gz -C /tmp/mls-ansible
+            - cd /tmp/mls-ansible/ansible
+            - ANSIBLE_ROLES_PATH=/tmp/mls-ansible/ansible/roles ansible-playbook -i localhost, -c local playbooks/harden.yml
+            - cd /
+            - rm -rf /tmp/mls-ansible /tmp/mls-ansible.tar.gz
+            - apt-get purge -y ansible-core
+            - apt-get autoremove -y
+            - apt-get clean
+  - name: validate
+    steps:
+      - name: CheckTheBaselineIsInPlace
+        action: ExecuteBash
+        inputs:
+          commands:
+            - set -euo pipefail
+            - test "$(sysctl -n net.ipv4.conf.all.accept_redirects)" = "0"
+            - systemctl is-enabled auditd
+            - sshd -t
+  - name: test
+    steps:
+      - name: SessionManagerAgentIsEnabled
+        action: ExecuteBash
+        inputs:
+          commands:
+            - set -euo pipefail
+            - systemctl is-enabled snap.amazon-ssm-agent.amazon-ssm-agent.service || systemctl is-enabled amazon-ssm-agent

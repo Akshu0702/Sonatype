@@ -1,0 +1,25 @@
+# tenants-service in uat. Rendered by helm/platform/charts/mls-service. Nothing for uat exists in AWS yet: these are values for a cluster that has not been built.
+# image.tag is written by the promote step (a pull request): "unpromoted" means no image has been promoted to this environment.
+# Names ending in .mls.internal are placeholders until the private DNS zone is decided.
+image:
+  repository: harbor.uat.mls.internal/mls/tenants-service
+  tag: unpromoted
+pullSecret:
+  remoteRef: mls/uat/harbor/pull-robot
+  registry: harbor.uat.mls.internal
+port: 8081
+healthPath: /actuator/health
+env:
+  DB_URL: jdbc:postgresql://REPLACE_WITH_RDS_ADDRESS:5432/tenants?sslmode=require
+  DB_USER: tenants
+  AUTH_SERVER_URL: https://auth.uat.mls.internal
+  KEYCLOAK_INTERNAL_URL: http://keycloak.keycloak.svc:8080
+  AUDIT_RELAY_ENABLED: "false"
+  SPRING_PROFILES_ACTIVE: uat
+externalSecret:
+  data:
+    - { secretKey: DB_PASSWORD, remoteRef: mls/uat/tenants/db-password }
+    - { secretKey: KEYCLOAK_AUTOMATION_CLIENT_SECRET, remoteRef: mls/uat/platform/keycloak-client }
+autoscaling:
+  minReplicas: 2
+  maxReplicas: 4

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: mls-service
+description: One chart for every platform service (tenants, ticketing, portal API, console). Image, port, settings and secrets come from the values.
+type: application
+version: 0.1.0
+appVersion: "0"

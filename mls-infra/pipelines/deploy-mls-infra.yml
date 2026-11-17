@@ -1,0 +1,127 @@
+# deploy-mls-infra: plans, guards, waits for approval, then applies exactly the plan that was approved.
+# Manual only: no CI trigger and no pull request trigger. Read pipelines/DEPLOY.md before the first run.
+trigger: none
+pr: none
+
+parameters:
+  - name: workingDirectory
+    displayName: Terraform working directory (a live composition)
+    type: string
+    default: terraform/live/lab-test
+  # Only "create" is allowed by default. Changing or replacing existing resources needs this to be chosen on purpose.
+  - name: allowedActions
+    type: string
+    default: create
+    values:
+      - create
+      - create,update
+  # Leave empty for Microsoft-hosted agents; set to a self-hosted pool (with Docker) otherwise.
+  - name: agentPool
+    type: string
+    default: ''
+
+variables:
+  # Holds AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY as secret variables. Created by hand; never in Git.
+  - group: mls-aws-deploy
+  - name: AWS_DEFAULT_REGION
+    value: ap-south-1
+  - name: AWS_REGION
+    value: ap-south-1
+  - name: EXPECTED_REGION
+    value: ap-south-1
+  - name: EXPECTED_ACCOUNT
+    value: '096631344162'
+
+stages:
+  - stage: Plan
+    displayName: Plan and guard
+    jobs:
+      - job: plan
+        displayName: Plan
+        pool:
+          ${{ if eq(parameters.agentPool, '') }}:
+            vmImage: ubuntu-24.04
+          ${{ if ne(parameters.agentPool, '') }}:
+            name: ${{ parameters.agentPool }}
+        steps:
+          - checkout: self
+          - script: python3 scripts/ci/test_plan_guard.py
+            displayName: Self-test the plan guard
+          - script: bash scripts/ci/deploy-preflight.sh
+            displayName: Check account, region and identity
+            env:
+              AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+              AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+          - script: bash scripts/ci/terraform-run.sh "${{ parameters.workingDirectory }}" init -input=false
+            displayName: terraform init
+            env:
+              AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+              AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+          - script: bash scripts/ci/terraform-run.sh "${{ parameters.workingDirectory }}" plan -input=false -out=tfplan
+            displayName: terraform plan
+            env:
+              AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+              AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+          - script: |
+              set -euo pipefail
+              bash scripts/ci/terraform-run.sh "${{ parameters.workingDirectory }}" show -json tfplan > "${{ parameters.workingDirectory }}/plan.json"
+              python3 scripts/ci/plan-guard.py "${{ parameters.workingDirectory }}/plan.json" --allow ${{ parameters.allowedActions }} --expect-region "$(EXPECTED_REGION)"
+              (cd "${{ parameters.workingDirectory }}" && sha256sum tfplan > tfplan.sha256)
+            displayName: Plan guard
+            env:
+              AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+              AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+          - task: PublishPipelineArtifact@1
+            displayName: Publish the plan for review
+            inputs:
+              targetPath: ${{ parameters.workingDirectory }}
+              artifact: tfplan
+              publishLocation: pipeline
+          - script: bash scripts/ci/fix-workspace-ownership.sh "$(Build.SourcesDirectory)" "$(Build.ArtifactStagingDirectory)"
+            displayName: Hand the workspace back to the agent user
+            condition: always()
+
+  - stage: Apply
+    displayName: Approve and apply
+    dependsOn: Plan
+    condition: and(succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/develop'), eq(variables['Build.SourceBranch'], 'refs/heads/main'), startsWith(variables['Build.SourceBranch'], 'refs/heads/release/')))
+    jobs:
+      - deployment: apply
+        displayName: Apply the approved plan
+        # The environment holds the approval check: nothing below runs until the named approver approves.
+        environment: mls-lab-apply
+        pool:
+          ${{ if eq(parameters.agentPool, '') }}:
+            vmImage: ubuntu-24.04
+          ${{ if ne(parameters.agentPool, '') }}:
+            name: ${{ parameters.agentPool }}
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - download: current
+                  artifact: tfplan
+                - script: |
+                    set -euo pipefail
+                    cp -r "$(Pipeline.Workspace)/tfplan/." "${{ parameters.workingDirectory }}/"
+                    (cd "${{ parameters.workingDirectory }}" && sha256sum -c tfplan.sha256)
+                  displayName: Restore the plan and check it is unchanged
+                - script: bash scripts/ci/deploy-preflight.sh
+                  displayName: Check account, region and identity again
+                  env:
+                    AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+                    AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+                - script: bash scripts/ci/terraform-run.sh "${{ parameters.workingDirectory }}" init -input=false
+                  displayName: terraform init
+                  env:
+                    AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+                    AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+                - script: bash scripts/ci/terraform-run.sh "${{ parameters.workingDirectory }}" apply -input=false tfplan
+                  displayName: terraform apply of the approved plan
+                  env:
+                    AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+                    AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+                - script: bash scripts/ci/fix-workspace-ownership.sh "$(Build.SourcesDirectory)" "$(Build.ArtifactStagingDirectory)"
+                  displayName: Hand the workspace back to the agent user
+                  condition: always()

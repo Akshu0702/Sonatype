@@ -1,0 +1,107 @@
+# ci-mls-portal-api: checks for the mls-portal-api repository.
+# Pull requests are validated by the branch build-validation policy on main and develop.
+trigger:
+  branches:
+    include:
+      - develop
+      - release/*
+  paths:
+    exclude:
+      - '*.md'
+
+parameters:
+  # The self-hosted build agent in Mumbai. Set to an empty string to use Microsoft-hosted agents.
+  - name: agentPool
+    type: string
+    default: mls-agents
+
+variables:
+  - name: securityEnforce
+    value: 'false'
+
+resources:
+  repositories:
+    - repository: infra
+      type: git
+      name: mls-infra
+    - repository: commons
+      type: git
+      name: mls-commons-lib
+      ref: refs/heads/develop
+
+stages:
+  - stage: Checks
+    displayName: Checks
+    jobs:
+      - job: spec
+        displayName: OpenAPI contract
+        pool:
+          ${{ if eq(parameters.agentPool, '') }}:
+            vmImage: ubuntu-24.04
+          ${{ if ne(parameters.agentPool, '') }}:
+            name: ${{ parameters.agentPool }}
+        steps:
+          - checkout: self
+          - script: bash scripts/ci/spec-lint.sh
+            displayName: Lint OpenAPI files
+          - script: docker run --rm -v "$(Build.SourcesDirectory):/w" -v "$(Build.ArtifactStagingDirectory):/a" alpine:3.20 chown -R "`id -u`:`id -g`" /w /a
+            displayName: Hand the workspace back to the agent user
+            condition: always()
+      - job: security
+        displayName: Security scans
+        pool:
+          ${{ if eq(parameters.agentPool, '') }}:
+            vmImage: ubuntu-24.04
+          ${{ if ne(parameters.agentPool, '') }}:
+            name: ${{ parameters.agentPool }}
+        steps:
+          - checkout: self
+          - script: bash scripts/ci/scan.sh
+            displayName: Security scan (secrets and dependencies)
+            env:
+              SECURITY_ENFORCE: ${{ variables.securityEnforce }}
+              SCAN_OUT: $(Build.ArtifactStagingDirectory)/scan-results
+            continueOnError: true
+          - task: PublishPipelineArtifact@1
+            displayName: Publish scan results
+            condition: always()
+            inputs:
+              targetPath: $(Build.ArtifactStagingDirectory)/scan-results
+              artifact: scan-results
+          - script: docker run --rm -v "$(Build.SourcesDirectory):/w" -v "$(Build.ArtifactStagingDirectory):/a" alpine:3.20 chown -R "`id -u`:`id -g`" /w /a
+            displayName: Hand the workspace back to the agent user
+            condition: always()
+      - job: build
+        displayName: Build and test (Maven, JDK 21)
+        pool:
+          ${{ if eq(parameters.agentPool, '') }}:
+            vmImage: ubuntu-24.04
+          ${{ if ne(parameters.agentPool, '') }}:
+            name: ${{ parameters.agentPool }}
+        steps:
+          - checkout: self
+          - checkout: commons
+          - script: bash mls-portal-api/scripts/test.sh
+            displayName: Build the library, then build and test the service
+            env:
+              COMMONS_DIR: $(Pipeline.Workspace)/s/mls-commons-lib
+              REPO_DIR: $(Pipeline.Workspace)/s/mls-portal-api
+          - template: pipelines/templates/maven-version.yml@infra
+            parameters:
+              dir: $(Pipeline.Workspace)/s/mls-portal-api
+          - template: pipelines/templates/maven-publish.yml@infra
+            parameters:
+              dir: $(Pipeline.Workspace)/s/mls-portal-api
+              commonsDir: $(Pipeline.Workspace)/s/mls-commons-lib
+          - task: PublishTestResults@2
+            displayName: Publish test results
+            condition: succeededOrFailed()
+            inputs:
+              testResultsFormat: JUnit
+              testResultsFiles: 'mls-portal-api/**/surefire-reports/TEST-*.xml'
+              searchFolder: $(Pipeline.Workspace)/s
+              mergeTestResults: true
+              testRunTitle: ci-mls-portal-api
+          - script: docker run --rm -v "$(Pipeline.Workspace)/s:/w" alpine:3.20 chown -R "`id -u`:`id -g`" /w
+            displayName: Hand the workspace back to the agent user
+            condition: always()

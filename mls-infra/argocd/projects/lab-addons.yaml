@@ -1,0 +1,19 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: lab-addons
+  namespace: argocd
+spec:
+  description: Cluster add-ons deployed from mls-infra
+  sourceRepos:
+    - https://dev.azure.com/ML-AIML-COE/Sonatype-MLS/_git/mls-infra
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: "*"
+  # Add-ons install CRDs and cluster roles, so cluster-scoped resources are allowed. The project is limited by
+  # its single source repository and by the fact that each Argo CD instance manages only its own cluster.
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"
+  orphanedResources:
+    warn: true

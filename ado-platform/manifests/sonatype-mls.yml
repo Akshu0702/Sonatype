@@ -1,0 +1,55 @@
+# ado-project.yml for the Sonatype Managed Lab project, written from the real setup on 2026-11-17. Names and decisions only, no secrets.
+project:
+  code: mls
+  name: Sonatype-MLS
+  organisation: ML-AIML-COE
+  process: Agile
+  delivery_lead: Krishna Prasad Vyakaranam
+  project_manager: Krishna Prasad Vyakaranam
+  go_live: 2026-12-04
+
+sprints:
+  length_days: 7
+  first_start: 2026-10-26
+  count: 6
+
+areas: [Infra, Portal-API, Portal-UI, Automation, Plugin-Bundle, Commons-Lib, Delivery, Tenants, IAM, Entitlements, Audit, Gateway]
+
+repositories:
+  - {name: mls-infra,            kind: infra,   area: Infra}
+  - {name: ado-platform,         kind: infra,   area: Delivery, naming_exempt: true}   # the procedure, adoctl, the plugin and the audit pipeline: shared by projects, so it keeps its own name
+  - {name: mls-commons-lib,      kind: library, area: Commons-Lib, publishes: true}
+  - {name: mls-tenants-api,      kind: api,     area: Tenants,     publishes: true}
+  - {name: mls-portal-api,       kind: api,     area: Portal-API,  publishes: true}
+  - {name: mls-itsm-api,         kind: api,     area: Portal-API,  publishes: true}
+  - {name: mls-portal-ui-react,  kind: ui,      area: Portal-UI}
+  - {name: mls-gateway-api,      kind: api,     area: Gateway}
+  - {name: mls-iam-api,          kind: api,     area: IAM}
+  - {name: mls-audit-api,        kind: api,     area: Audit}
+  - {name: mls-automation-api,   kind: api,     area: Automation}
+  - {name: mls-fwplugin-bundle,  kind: api,     area: Plugin-Bundle}
+
+repositories_ignore: [Sonatype-MLS]   # the project's default repository; it holds nothing
+
+policies:
+  min_reviewers: 1
+  author_can_approve: true            # relaxed on 2026-11-13 so the delivery lead can approve pull requests an assistant creates; see wiki Engineering/Pull-request-approval
+  reset_votes_on_push: true
+  merge_develop: squash
+  merge_main: merge-commit
+  max_file_size_mb: 10
+
+feed:
+  name: mls-maven
+  views: [Local, Prerelease, Release]
+
+environments:
+  - {name: dev, approver: Krishna Prasad Vyakaranam, dry_run_first: true}
+
+agents:
+  pool: mls-agents
+
+stack:
+  pinned:
+    java: "21"
+    spring_boot: "4.1.2"

@@ -1,0 +1,4 @@
+# Managed by Ansible (baseline_hardening). Do not edit by hand.
+{% for module in baseline_hardening_disabled_modules %}
+install {{ module }} /bin/true
+{% endfor %}

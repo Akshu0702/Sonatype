@@ -1,0 +1,12 @@
+# ansible-lint (production profile) and the container idempotence test for the roles.
+steps:
+  - script: bash scripts/ci/run-if-present.sh "ansible-lint" ansible/tests/lint.sh
+    displayName: Ansible lint
+  # The roles are tested on both operating systems in the design: apply twice (second run changes nothing) and verify.
+  - script: bash scripts/ci/run-if-present.sh "ansible role tests (Ubuntu 24.04)" ansible/tests/run-container-test.sh ubuntu:24.04
+    displayName: Ansible role tests (Ubuntu 24.04, container)
+  - script: bash scripts/ci/run-if-present.sh "ansible role tests (Amazon Linux 2023)" ansible/tests/run-container-test.sh amazonlinux:2023
+    displayName: Ansible role tests (Amazon Linux 2023, container)
+  - script: bash scripts/ci/fix-workspace-ownership.sh "$(Build.SourcesDirectory)" "$(Build.ArtifactStagingDirectory)"
+    displayName: Hand the workspace back to the agent user
+    condition: always()
